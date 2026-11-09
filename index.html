@@ -1,0 +1,1259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>内容需求工作台 · 亚马逊家居</title>
+<!-- 本工作台为单文件���地方案：全内联，零外部依赖，数据存 localStorage -->
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --blue:#185FA5; --blue-l:#F0F6FC;
+  --red:#B3382F; --red-l:#FDF3F2; --red-b:#EBC9C5;
+  --green:#2E7D32; --green-l:#F1F8F1;
+  --amber:#A9670A; --amber-l:#FDF8EF;
+  --gray:#6B6B6B; --gray-l:#F5F5F5; --gray-b:#DCDCDC;
+  --purple:#5B4EA8; --purple-l:#F4F3F9;
+  --line:#E7E7E7;
+}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  background:#FFFFFF;color:#1F1F1F;font-size:14px;line-height:1.6;
+  padding-bottom:calc(28px + env(safe-area-inset-bottom));
+  -webkit-text-size-adjust:100%;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:14px}
+h1{font-size:17px;font-weight:500}
+.card{background:#fff;border:0.5px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px}
+button,.btn{
+  font-family:inherit;font-size:14px;cursor:pointer;border:0.5px solid var(--gray-b);
+  background:#fff;color:#2C2C2A;border-radius:8px;padding:8px 12px;min-height:44px;
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+}
+button:hover{background:var(--gray-l)}
+.btn-p{background:var(--blue);color:#fff;border-color:var(--blue)}
+.btn-p:hover{background:#0F4C8A}
+.btn-sm{min-height:36px;padding:5px 10px;font-size:13px}
+.btn-danger{color:var(--red);border-color:var(--red-b)}
+input,select,textarea{
+  font-family:inherit;font-size:16px;color:#2C2C2A;background:#fff;
+  border:0.5px solid var(--gray-b);border-radius:8px;padding:9px 11px;min-height:44px;width:100%;
+}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--blue);outline-offset:-1px}
+label{display:block;font-size:13px;color:var(--gray);margin-bottom:4px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hint{font-size:12px;color:#8A8A85;margin-top:4px;line-height:1.5}
+.muted{color:var(--gray);font-size:13px}
+.tag{display:inline-flex;align-items:center;font-size:12px;padding:3px 8px;border-radius:5px;white-space:nowrap}
+.t-blue{background:var(--blue-l);color:var(--blue)}
+.t-red{background:var(--red);color:#fff}
+.t-amber{background:var(--amber-l);color:var(--amber)}
+.t-green{background:var(--green-l);color:var(--green)}
+.t-gray{background:var(--gray-l);color:var(--gray)}
+.t-purple{background:var(--purple-l);color:var(--purple)}
+.empty{text-align:center;color:var(--gray);padding:26px 12px;font-size:13px}
+
+/* 主区页签：需求清单 / 卡点分析 */
+.pane-sw{display:flex;gap:6px;margin:12px 0 10px}
+.psw{flex:1;min-height:40px;font-size:13.5px;border-radius:8px;border:0.5px solid var(--gray-b);background:#fff;color:var(--gray)}
+.psw.on{background:var(--blue);color:#fff;border-color:var(--blue);font-weight:500}
+/* 分析页 */
+.ip-h{display:flex;align-items:baseline;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.ip-h b{font-size:15px;font-weight:600}
+.ip-lead{background:#fff;border:0.5px solid var(--line);border-left:3px solid var(--red);border-radius:10px;
+  padding:11px 14px;font-size:13.5px;line-height:1.75;margin-bottom:12px}
+.ip-lead b{color:var(--red);font-weight:600}
+.ip-lead i{font-style:normal;color:var(--green);font-weight:600}
+.ip-split{display:flex;height:12px;border-radius:6px;overflow:hidden;background:var(--gray-l);margin:8px 0 6px}
+.ip-split i{display:block;height:100%}
+.ip-lg{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--gray);margin-bottom:4px}
+.ip-lg span{display:flex;align-items:center;gap:5px}
+.ip-dot{width:9px;height:9px;border-radius:2px;display:inline-block}
+.ip-find{border:0.5px solid var(--line);border-radius:10px;padding:10px 12px;background:#fff;margin-bottom:8px;font-size:13px;line-height:1.65}
+.ip-find .k{font-size:12px;color:var(--gray)}
+.ip-find .k b{color:#2C2C2A;font-weight:500}
+.ip-tb{width:100%;border-collapse:collapse;font-size:13px}
+.ip-tb th{text-align:left;font-weight:500;color:var(--gray);font-size:12px;padding:7px 6px;border-bottom:0.5px solid var(--line);white-space:nowrap}
+.ip-tb td{padding:9px 6px;border-bottom:0.5px solid var(--line);vertical-align:top}
+.ip-tb tr:last-child td{border-bottom:0}
+.ip-tb .num{font-variant-numeric:tabular-nums;text-align:center}
+.ip-tb .nm{font-weight:500;white-space:nowrap}
+.ip-tb .bad{color:var(--red);font-weight:600}
+.ip-tb .warn{color:var(--amber);font-weight:600}
+.ip-tb .mintxt{font-size:12px;color:var(--gray);line-height:1.5}
+
+/* header */
+header{background:#fff;border-bottom:0.5px solid var(--line);padding:12px 16px;position:sticky;top:0;z-index:20}
+.hd{max-width:1180px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.hd-l{display:flex;align-items:center;gap:10px;min-width:0}
+.hd-acts{display:flex;gap:6px;flex-wrap:wrap}
+
+/* layout */
+.layout{display:grid;grid-template-columns:236px minmax(0,1fr);gap:14px;align-items:start;margin-top:14px}
+@media(max-width:900px){.layout{grid-template-columns:1fr;gap:12px}}
+.side{background:#fff;border:0.5px solid var(--line);border-radius:12px;padding:12px;position:sticky;top:74px}
+@media(max-width:900px){.side{position:static}}
+
+/* scope tabs */
+.vtabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}
+.vtab{padding:10px 6px;font-size:13px;min-height:44px;border-radius:8px;border:0.5px solid var(--gray-b);
+  background:#fff;cursor:pointer;text-align:center;line-height:1.3}
+.vtab b{display:block;font-size:16px;font-weight:600}
+.vtab.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+.vtab.on span{color:#D6E8F7}
+
+/* filter groups */
+.fg{margin-bottom:14px}
+.fg-t{font-size:12px;color:var(--gray);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+.fi{display:flex;align-items:center;gap:8px;width:100%;padding:7px 8px;min-height:38px;border-radius:7px;
+  border:0;background:transparent;cursor:pointer;text-align:left;font-size:13px;color:#2C2C2A}
+.fi:hover{background:var(--gray-l)}
+.fi.on{background:var(--blue-l);color:var(--blue);font-weight:500}
+.fi-n{margin-left:auto;font-size:12px;color:var(--gray);font-variant-numeric:tabular-nums}
+.fi.on .fi-n{color:var(--blue)}
+.fi-bar{height:3px;border-radius:2px;background:var(--line);flex:0 0 34px;overflow:hidden}
+.fi-bar i{display:block;height:100%;background:var(--blue);border-radius:2px}
+.fi.on .fi-bar i{background:var(--blue)}
+.fi-red .fi-bar i{background:var(--red)} .fi-red .fi-n{color:var(--red)}
+.fi-amber .fi-bar i{background:var(--amber)} .fi-amber .fi-n{color:var(--amber)}
+.fg-sep{height:1px;background:var(--line);margin:10px 0}
+.fg-hint{font-style:normal;font-size:11px;color:var(--gray-b)}
+
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media(max-width:560px){.stats{grid-template-columns:1fr 1fr}}
+.st{background:#fff;border:0.5px solid var(--line);border-radius:10px;padding:11px 12px}
+.st .n{font-size:22px;font-weight:500;line-height:1.2;font-variant-numeric:tabular-nums}
+.st .l{font-size:12px;color:var(--gray)}
+.st.red .n{color:var(--red)} .st.amber .n{color:var(--amber)} .st.green .n{color:var(--green)}
+.st.gray-s .n{color:var(--gray)}
+
+/* 红线规则说明条 */
+.rulebar{background:#fff;border:0.5px solid var(--line);border-radius:10px;padding:9px 12px;margin-top:10px;
+  display:flex;gap:6px 16px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--gray)}
+/* 数据缺口提示条 */
+.gaptip{display:flex;align-items:flex-start;gap:8px;background:#FFF8E6;border:0.5px solid #E8D9A8;
+  border-radius:10px;padding:9px 12px;margin-top:8px;font-size:12.5px;color:#6B5518;line-height:1.55}
+.gaptip svg{flex-shrink:0;margin-top:1px}
+.gaptip a{color:#8A5A00;text-decoration:underline;white-space:nowrap}
+.rulebar b{color:var(--red);font-weight:500}
+.rb-ti{font-weight:500;color:#2C2C2A}
+
+/* 双时间锚点进度条 */
+.rb{margin-top:8px;padding-top:8px;border-top:0.5px dashed var(--line)}
+.rb-none{font-size:12px;color:var(--gray-b)}
+.rb-d{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--gray);margin-bottom:5px}
+.rb-d b{font-weight:500;color:#2C2C2A;font-variant-numeric:tabular-nums}
+.rb-na{color:var(--gray-b)}
+.rb-ok{font-style:normal;color:var(--green);font-size:11px}
+.rb-red{display:flex;align-items:center;gap:8px;font-size:12px;padding:5px 9px;border-radius:6px;flex-wrap:wrap}
+.rb-k{font-weight:500}
+.rb-v{font-variant-numeric:tabular-nums;color:var(--gray)}
+.rb-t{margin-left:auto;font-variant-numeric:tabular-nums}
+.rb-r1{background:var(--red-l);color:var(--red)}
+.rb-r2{background:var(--amber-l);color:var(--amber)}
+.rb-r3{background:var(--blue-l);color:var(--blue)}
+.rb-r0{background:var(--gray-l);color:var(--gray)}
+.rb-red.rb-ok{background:var(--green-l);color:var(--green)}
+
+/* today */
+.today{background:var(--red-l);border:0.5px solid var(--red-b);border-radius:12px;padding:12px 14px;margin-bottom:12px}
+.today-t{font-size:14px;font-weight:500;color:var(--red);margin-bottom:8px;display:flex;align-items:center;gap:7px}
+.ti{background:#fff;border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ti:last-child{margin-bottom:0}
+.ti-main{flex:1;min-width:170px}
+.ti-n{font-size:14px;font-weight:500;word-break:break-word;line-height:1.4}
+.ti-s{font-size:12px;color:var(--gray);margin-top:2px}
+.today-ok{background:var(--green-l);border:0.5px solid #C0D99A;border-radius:12px;padding:12px 14px;
+  color:var(--green);font-size:13px;margin-bottom:12px}
+
+/* list toolbar */
+.tb{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.tb-n{font-size:13px;color:var(--gray)}
+.chip{font-size:12px;padding:5px 10px;min-height:34px;border-radius:7px;border:0.5px solid var(--gray-b);
+  background:#fff;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+.chip.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+/* requirement card */
+.req{background:#fff;border:0.5px solid var(--line);border-radius:10px;padding:11px 13px;margin-bottom:8px}
+.req.od{border-color:var(--red-b);background:#FFFCFC}
+.req-h{display:flex;align-items:flex-start;gap:8px}
+.req-n{flex:1;min-width:0;font-size:14px;font-weight:500;word-break:break-word;line-height:1.4}
+.req-m{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center}
+.req-w{font-size:12px;color:var(--gray);margin-top:5px;line-height:1.5}
+.req-w b{color:var(--red);font-weight:500}
+.req-a{margin-top:8px;display:flex;gap:6px}
+.more{text-align:center;padding:10px}
+
+/* modal */
+.mask{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.35);z-index:50;
+  padding:20px 12px;overflow-y:auto}
+.mask.on{display:block}
+.modal{background:#fff;border-radius:12px;padding:16px;max-width:560px;margin:0 auto}
+.mt{font-size:16px;font-weight:500;margin-bottom:12px}
+.mf{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
+.fld{margin-bottom:11px}
+#toast{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:80px;background:#2C2C2A;color:#fff;
+  padding:10px 18px;border-radius:8px;font-size:14px;z-index:99;max-width:90%}
+.links{display:flex;flex-wrap:wrap;gap:8px}
+.lk{display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:8px 12px;min-height:44px;
+  border-radius:8px;border:0.5px solid var(--line);background:#fff;color:#2C2C2A;text-decoration:none}
+.lk:hover{background:var(--blue-l);border-color:var(--blue)}
+.lk-na{opacity:.5}
+/* 刷新按钮转圈反馈 */
+@keyframes wbs-spin{to{transform:rotate(360deg)}}
+#btnRefresh.busy svg{animation:wbs-spin .8s linear infinite}
+#btnRefresh:disabled{opacity:.7;cursor:default}
+/* 数据新鲜度标记 */
+.ds{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:3px 9px;border-radius:20px;
+  background:var(--gray-l);color:var(--gray);cursor:pointer;white-space:nowrap}
+.ds.stale{background:var(--amber-l);color:var(--amber)}
+.ds-old{background:var(--red-l);color:var(--red)}
+/* ===== 干净白色主题 =====
+   纯白底 + 中性灰细线；语义色只留在文字、细边框和数据图表上，
+   不再用大块彩色背景铺满屏幕 */
+.card,.st,.side,.rulebar,.req,.ti,.lk,.vtab,.chip,.psw,button.btn,button{
+  background:#fff;border-color:var(--line);
+}
+.card,.st,.side,.rulebar,.req{box-shadow:0 1px 2px rgba(0,0,0,.035)}
+/* 今日处理：白底 + 红色左边框，保留警示但不铺红 */
+.today{background:#fff;border:0.5px solid var(--line);border-left:3px solid var(--red)}
+.today-ok{background:#fff;border:0.5px solid var(--line);border-left:3px solid var(--green)}
+.gaptip{background:#fff;border:0.5px solid var(--line);border-left:3px solid var(--amber);color:#6B5518}
+.req.od{background:#fff;border-color:var(--red-b)}
+/* 红线胶囊：白底细边 + 语义色文字 */
+.rb-r1{background:#fff;border:0.5px solid var(--red-b)}
+.rb-r2{background:#fff;border:0.5px solid #EBDCBE}
+.rb-r3{background:#fff;border:0.5px solid #D8E4F2}
+.rb-r0{background:#FAFAFA;border:0.5px solid var(--line)}
+.rb-red.rb-ok{background:#fff;border:0.5px solid #CDE3CD}
+/* 非语义标签统一中性灰，减少彩色碎块 */
+.t-blue,.t-purple,.t-gray{background:#F4F4F4;color:#555}
+.ds,.ds.stale,.ds-old{background:#F5F5F5}
+.lk:hover{background:#F7F7F7;border-color:var(--line)}
+.fi.on{background:#F0F6FC}
+.ip-split{background:#F0F0F0}
+/* ===== 设计停留视图 ===== */
+.dsv-sum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+@media(max-width:560px){.dsv-sum{grid-template-columns:1fr 1fr}}
+.dsv-note{background:#fff;border:0.5px solid var(--line);border-left:3px solid var(--blue);
+  border-radius:10px;padding:10px 12px;font-size:12.5px;color:var(--gray);line-height:1.7;margin-bottom:12px}
+.dsv-note b{color:#1F1F1F;font-weight:500}
+.dsv-bar{height:6px;border-radius:3px;background:#F0F0F0;overflow:hidden;margin-top:5px;min-width:70px}
+.dsv-bar i{display:block;height:100%;background:var(--blue)}
+.dsv-bar i.hot{background:var(--red)}
+/* 明细表排序切换（放标题行内，不额外占一行） */
+.dsv-sort{font-size:11.5px;min-height:28px;padding:3px 9px;border-radius:6px;
+  border:0.5px solid var(--line);background:#fff;color:var(--gray);cursor:pointer}
+.dsv-sort.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hd">
+    <div class="hd-l">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#185FA5" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+      <h1>内容需求工作台</h1>
+      <span class="muted" id="hdDate"></span>
+      <span class="ds" id="hdSync" onclick="syncTip()"></span>
+    </div>
+    <div class="hd-acts">
+      <button class="btn-sm" id="btnRefresh" onclick="doRefresh()" title="重新载入最新数据快照并重算全部状态">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+        刷新
+      </button>
+      <button class="btn-sm" onclick="exportJSON()">导出备份</button>
+      <button class="btn-sm" onclick="document.getElementById('impFile').click()">导入恢复</button>
+      <button class="btn-sm btn-p" onclick="openNew()">+ 新增需求</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="layout">
+
+    <!-- 左侧栏 -->
+    <aside class="side">
+      <div class="vtabs">
+        <div class="vtab on" id="vt-mine" onclick="setView('mine')"><b id="cnMine">0</b><span>我的需求</span></div>
+        <div class="vtab" id="vt-dept" onclick="setView('dept')"><b id="cnDept">0</b><span>部门总览</span></div>
+      </div>
+
+      <div class="fg">
+        <div class="fg-t"><span>按时间红线</span></div>
+        <div id="fgRed"></div>
+      </div>
+      <div class="fg-sep"></div>
+      <div class="fg">
+        <div class="fg-t"><span>按阶段</span></div>
+        <div id="fgStage"></div>
+      </div>
+      <div class="fg-sep"></div>
+      <div class="fg">
+        <div class="fg-t"><span>按负责人</span></div>
+        <div id="fgOwner"></div>
+      </div>
+      <div class="fg-sep"></div>
+      <button class="btn-sm" style="width:100%" onclick="clearSel()">清除筛选</button>
+    </aside>
+
+    <!-- 主区 -->
+    <main>
+      <div class="stats" id="stats"></div>
+      <div class="rulebar">
+        <span class="rb-ti">红线</span>
+        <span>内容 · <b>出货前14天</b>完稿</span>
+        <span>拍摄 · <b>出货前21天</b>寄样（样品已到不判逾期）</span>
+        <span>设计 · <b>进仓前</b>出图（无进仓按上架）</span>
+      </div>
+      <div id="gapTip"></div>
+      <div class="pane-sw">
+        <button class="psw on" id="psw-list" onclick="setPane('list')">需求清单</button>
+        <button class="psw" id="psw-insight" onclick="setPane('insight')">卡点分析</button>
+        <button class="psw" id="psw-design" onclick="setPane('design')">延误出图</button>
+      </div>
+
+      <div id="paneList">
+      <div id="todayBox"></div>
+
+      <div class="tb">
+        <span class="tb-n" id="listN"></span>
+        <span style="flex:1"></span>
+        <button class="chip on" id="sf-all" onclick="setStatus('all')">全部</button>
+        <button class="chip" id="sf-anchor" onclick="setStatus('anchor')">仅看需处理</button>
+      </div>
+      <div id="list"></div>
+      <div class="more"><button class="btn-sm" id="moreBtn" onclick="moreList()" style="display:none">加载更多</button></div>
+      </div>
+
+      <div id="paneInsight" style="display:none"></div>
+      <div id="paneDesign" style="display:none"></div>
+
+      <div class="card" style="margin-top:16px">
+        <div style="font-size:14px;font-weight:500;margin-bottom:10px">常用入口</div>
+        <div class="links" id="links"></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- 编辑/新增 -->
+<div class="mask" id="maskE">
+  <div class="modal">
+    <div class="mt" id="eTitle">编辑需求</div>
+    <div class="fld"><label>需求名称</label><input id="eName" placeholder="品牌-产品名-站点"></div>
+    <div class="row">
+      <div class="fld"><label>当前进度</label><select id="eProg"></select></div>
+      <div class="fld"><label>负责人</label><select id="eOwner"></select></div>
+    </div>
+    <div class="row">
+      <div class="fld"><label>期望完成时间</label><input type="date" id="eExp"></div>
+      <div class="fld"><label>预计上架时间 <em class="fg-hint">有进仓时忽略</em></label><input type="date" id="eLau"></div>
+    </div>
+    <div class="row">
+      <div class="fld"><label>需求提交时间</label><input type="date" id="eSub"></div>
+      <div class="fld"><label>品类</label><input id="eCat" placeholder="如 Duvet Cover Sets"></div>
+    </div>
+    <div class="fg-sep"></div>
+    <div class="row">
+      <div class="fld"><label>首批出货时间 <em class="fg-hint">内容/拍摄红线</em></label><input type="date" id="eFsh"></div>
+      <div class="fld"><label>进仓时间 <em class="fg-hint">项目结束锚点，优先于上架</em></label><input type="date" id="eWh"></div>
+    </div>
+    <div class="fld"><label>实际出货时间</label><input type="date" id="eAsh"></div>
+    <div class="fld"><label>备注</label><textarea id="eNote" rows="2" placeholder="卡点说明、催办记录…"></textarea></div>
+    <div class="mf">
+      <button class="btn-danger" onclick="delReq()">删除</button>
+      <span style="flex:1"></span>
+      <button onclick="closeE()">取消</button>
+      <button class="btn-p" onclick="saveEdit()">保存</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="impFile" accept=".json" style="display:none">
+<div id="toast"></div>
+
+<script>
+/* ========== 种子数据（源自钉钉需求总表 + 新品全链路进度表 2026-10-09 快照） ========== */
+var SEED=[{"id":"6MTgLQB18e","n":"JOLLYVOGUE-抽条兔毛宠物窝-US","s":"设计阶段","p":"设计排期中","pr":"主图A+设计需求","w":"文姐","o":0,"u":"2026-10-09","e":"","rt":"","ps":"2026-09-21","log":"公司设计排期中","fin":"","sh":"","sub":"","l":"2026-12-06","f":"2026-10-22","h":"2026-12-08","sd":"2026-10-01","bk":"2026-10-27","c":"JOLLYVOGUE-US","q":"2款共9个颜色"},{"id":"9sG4fT8izT","n":"Sasttie-动物纹理地毯-US","s":"内容阶段","p":"未开始","pr":"主图A+设计需求","w":"晓晓","o":1,"u":"","e":"","rt":"","ps":"2026-12-01","log":"","fin":"","sh":"","sub":"","l":"2027-02-09","f":"2026-12-26","h":"","sd":"2026-12-05","bk":"2026-12-31","c":"MMT_SASTTIE-US","q":"4个花色 延迟下单\n预计1/1发货"},{"id":"CWcFPg3jky","n":"Sasttie-280g仿羊绒复古花卉01地毯-US","s":"内容阶段","p":"未开始","pr":"主图A+设计需求","w":"诗雨","o":0,"u":"","e":"","rt":"","ps":"","log":"","fin":"","sh":"","sub":"","l":"2027-01-16","f":"2026-12-02","h":"","sd":"2026-11-11","bk":"2026-12-07","c":"MMT_SASTTIE-US","q":""},{"id":"EnWBNQQQuD","n":"MUXHOMO-亚麻被套三件套-US","s":"设计阶段","p":"设计作图中","pr":"主图A+设计需求","w":"诗雨","o":0,"u":"2026-10-21","e":"","rt":"","ps":"2026-09-14","log":"11.5 确认首图排版\n11.4 啦啦开始作图","fin":"","sh":"","sub":"已完成","l":"2026-10-30","f":"2026-09-15","h":"2026-11-06","sd":"2026-08-25","bk":"2026-09-20","c":"MUXHOMO","q":"5个颜色"},{"id":"FTSGojhFue","n":"Sasttie-簇绒棋盘格被套三件套-US","s":"内容阶段","p":"作图需求编写中","pr":"主图A+设计需求","w":"晓晓","o":1,"u":"","e":"","rt":"","ps":"2026-11-06","log":"","fin":"","sh":"","sub":"","l":"2026-12-27","f":"2026-11-12","h":"","sd":"2026-10-22","bk":"2026-11-17","c":"MMT_SASTTIE-US","q":"7个颜色"},{"id":"Kxi9cs46lS","n":"JOLLYVOGUE-华夫格被子三件套-US","s":"内容阶段","p":"未开始","pr":"主图A+设计需求","w":"诗雨","o":0,"u":"","e":"","rt":"","ps":"2026-10-12","log":"","fin":"","sh":"","sub":"","l":"2027-01-14","f":"2026-11-30","h":"","sd":"2026-11-09","bk":"2026-12-05","c":"DAMAIJI","q":"被套换背景排版"},{"id":"NXWQIxKspx","n":"JOLLYVOGUE-兔毛豹纹半包拖鞋-US","s":"拍摄阶段","p":"等待拍摄样","pr":"新增变体（需拍摄）","w":"晓晓","o":1,"u":"2026-11-03","e":"","rt":"","ps":"2026-11-03","log":"","fin":"","sh":"","sub":"","l":"2027-01-16","f":"2026-12-02","h":"2026-06-21","sd":"2026-11-11","bk":"2026-12-07","c":"DAMAIJI-US","q":"4个色"},{"id":"Na82lDRnJb","n":"MUXHOMO-色织纯棉被子三件套-US","s":"设计阶段","p":"设计作图中","pr":"主图A+设计需求","w":"楠楠","o":0,"u":"2026-07-30","e":"","rt":"2026-06-29","ps":"2026-07-13","log":"11.5 已返图待修改文本\n11.2 外包设计（任儿）A+修改，小R调完10套主图\n10.27 外包设计（任儿）开始A+作图\n10.26 外包设计（小R）开始非主推套版\n10.21 外包设计（任儿）开始作图","fin":"","sh":"","sub":"计划中","l":"2026-10-18","f":"2026-09-03","h":"2026-11-03","sd":"2026-08-13","bk":"2026-09-08","c":"MUXHOMO","q":"19个印花"},{"id":"POhvxN9JT6","n":"Sasttie-280g仿羊绒复古花卉地毯-US","s":"设计阶段","p":"设计作图中","pr":"主图A+设计需求","w":"晓晓","o":1,"u":"2026-10-08","e":"","rt":"","ps":"2026-10-05","log":"11.5 预计明天返图","fin":"","sh":"","sub":"","l":"2026-12-03","f":"2026-10-19","h":"2026-11-30","sd":"2026-09-28","bk":"2026-10-24","c":"MMT_SASTTIE-US","q":"8个印花"},{"id":"QX9fD1V7ut","n":"YUGYVOB-麂皮花边半包拖鞋-US","s":"内容阶段","p":"作图需求编写中","pr":"主图A+设计需求","w":"诗雨","o":0,"u":"","e":"","rt":"","ps":"2026-10-12","log":"","fin":"","sh":"","sub":"","l":"2026-12-14","f":"2026-10-30","h":"2026-12-15","sd":"2026-10-09","bk":"2026-11-04","c":"QIYUMIN-US","q":"7个颜色"},{"id":"SFWAoqvkvD","n":"JOLLYVOGUE-儿童数码印花被子七件套-US","s":"内容阶段","p":"未开始","pr":"主图A+设计需求","w":"晓晓","o":1,"u":"","e":"","rt":"","ps":"2026-11-09","log":"","fin":"","sh":"","sub":"","l":"2027-02-20","f":"2027-01-06","h":"","sd":"2026-12-16","bk":"2027-01-11","c":"DAMAIJI","q":"12个花色"},{"id":"U2dvxkdt3d","n":"MUXHOMO-muslin被套三件套-US","s":"设计阶段","p":"设计排期中","pr":"主图A+设计需求","w":"楠楠","o":0,"u":"2026-10-21","e":"","rt":"","ps":"2026-09-28","log":"公司设计排期中","fin":"","sh":"","sub":"待安排","l":"2026-11-29","f":"2026-10-15","h":"2026-12-02","sd":"2026-09-24","bk":"2026-10-20","c":"MUXHOMO","q":"6个颜色"},{"id":"W5HrhmBiNA","n":"HUXMEYSON-植绒浴室垫-US","s":"内容阶段","p":"作图需求编写中","pr":"主图A+设计需求","w":"楠楠","o":0,"u":"","e":"","rt":"","ps":"2026-10-19","log":"","fin":"","sh":"","sub":"","l":"2026-12-31","f":"2026-11-16","h":"","sd":"2026-10-26","bk":"2026-11-21","c":"HUXMEYSON-US","q":"13个变体"},{"id":"ZTZiLYpPIO","n":"Sasttie-280g复古芜花仿羊绒海绵印花地毯-US","s":"设计阶段","p":"设计作图中","pr":"主附图需求","w":"晓晓","o":1,"u":"2026-08-27","e":"","rt":"","ps":"2026-08-24","log":"11.5 今天出首版11.2 预计今天或明天反拍摄图 10.24 大鹏已拍完，调色中","fin":"","sh":"2026-11-07","sub":"","l":"2026-11-12","f":"2026-09-28","h":"2026-05-20","sd":"2026-09-07","bk":"2026-10-03","c":"MMT_SASTTIE-US","q":"新增颜色变体"},{"id":"aNixHlBGOw","n":"OMYSTYLE-仿天丝浴缸垫-US","s":"设计阶段","p":"设计排期中","pr":"主图A+优化需求","w":"晓晓","o":1,"u":"2026-10-10","e":"","rt":"2026-10-07","ps":"2026-09-28","log":"11.2 公司设计排期中，希望本月可以排上作图","fin":"","sh":"","sub":"","l":"2026-11-30","f":"2026-10-16","h":"2025-03-28","sd":"2026-09-25","bk":"2026-10-21","c":"OS OMYSTYLE-US","q":"老品新拍素材优化"},{"id":"iOzlXwrIKn","n":"MUXHOMO-H1剪花被子三件套-CA","s":"拍摄阶段","p":"等待拍摄样","pr":"主图A+设计需求","w":"楠楠","o":0,"u":"2026-10-23","e":"","rt":"","ps":"2026-10-12","log":"","fin":"","sh":"","sub":"","l":"2026-12-14","f":"2026-10-30","h":"2026-12-16","sd":"2026-10-09","bk":"2026-11-04","c":"MUXHOMO","q":"14个颜色 被套的基础上换场景和排版"},{"id":"iibqgT7aBu","n":"OMYSTYLE-经典款珑骧毛毡包-US","s":"内容阶段","p":"BOM信息整理中","pr":"主图A+设计需求","w":"楠楠","o":0,"u":"","e":"","rt":"","ps":"2026-11-09","log":"","fin":"","sh":"","sub":"","l":"2026-12-31","f":"2026-11-16","h":"","sd":"2026-10-26","bk":"2026-11-21","c":"OMYSTYLEFASHION-US","q":"8个颜色、三个尺寸"},{"id":"io0KeH9bJi","n":"JOLLYVOGUE-凉感月牙枕-US","s":"拍摄阶段","p":"等待拍摄返图","pr":"主图A+设计需求","w":"诗雨","o":0,"u":"2026-10-24","e":"","rt":"2026-08-25","ps":"2026-09-21","log":"","fin":"","sh":"","sub":"","l":"2026-12-06","f":"2026-10-22","h":"2026-11-26","sd":"2026-10-01","bk":"2026-10-27","c":"DAMAIJI","q":"7个变体"},{"id":"ivUiIz5ffm","n":"JOLLYVOGUE-木耳边圆网印花被子三件套-US","s":"设计阶段","p":"设计作图中","pr":"新增变体（需拍摄）","w":"晓晓","o":1,"u":"2026-09-12","e":"","rt":"2026-08-20","ps":"2026-08-20","log":"11.5 一天差不多做完 明天开始调色11.2 明天大概可以开始作图","fin":"","sh":"","sub":"","l":"2026-11-15","f":"2026-10-01","h":"2026-11-13","sd":"2026-09-10","bk":"2026-10-06","c":"","q":"仅1款"},{"id":"llDpDc9qoc","n":"JOLLYVOGUE-双层木耳边泡泡纱被子三件套-US","s":"设计阶段","p":"设计排期中","pr":"新增变体（需拍摄）","w":"晓晓","o":1,"u":"2026-09-12","e":"","rt":"2026-08-20","ps":"2026-08-20","log":"11.2 诗童本周或下周开始做","fin":"","sh":"","sub":"待安排","l":"2026-11-15","f":"2026-10-01","h":"2026-11-13","sd":"2026-09-10","bk":"2026-10-06","c":"","q":"仅1款"},{"id":"lypDzEBUTW","n":"HUXMEYSON-几何款仿羊绒浴室垫-US","s":"内容阶段","p":"作图需求编写中","pr":"主图A+设计需求","w":"诗雨","o":0,"u":"","e":"","rt":"","ps":"2026-10-26","log":"","fin":"","sh":"","sub":"","l":"2026-12-27","f":"2026-11-12","h":"2027-01-01","sd":"2026-10-22","bk":"2026-11-17","c":"HUXMEYSON-US","q":"4款共17个颜色"},{"id":"m2OX79n0lR","n":"Sasttie-280g仿羊绒波斯01地毯-US","s":"设计阶段","p":"设计排期中","pr":"首图优化","w":"诗雨","o":0,"u":"2026-11-07","e":"","rt":"","ps":"","log":"","fin":"","sh":"","sub":"","l":"","f":"","h":"2026-10-14","sd":"","bk":"","c":"","q":"2张"},{"id":"m6lYDjzvCe","n":"OMYSTYLE-挂钩款软料珑骧毛毡包-US","s":"设计阶段","p":"设计排期中","pr":"主图A+设计需求","w":"楠楠","o":0,"u":"2026-10-09","e":"","rt":"","ps":"2026-09-14","log":"","fin":"","sh":"","sub":"","l":"2026-11-05","f":"2026-09-21","h":"2026-11-21","sd":"2026-08-31","bk":"2026-09-26","c":"FA-OMYSTYLE","q":"12个颜色"},{"id":"mc8UeKIoZJ","n":"JOLLYVOGUE-雪尼尔鞭炮绒宠物窝-US","s":"内容阶段","p":"未开始","pr":"主图A+设计需求","w":"晓晓","o":1,"u":"","e":"","rt":"","ps":"2026-11-09","log":"","fin":"","sh":"","sub":"","l":"2027-02-08","f":"2026-12-25","h":"","sd":"2026-12-04","bk":"2026-12-30","c":"DAMAIJI-US","q":"3个色"},{"id":"srjYQO4EdL","n":"MUXHOMO-350g仿羊绒波浪边框地毯-US","s":"设计阶段","p":"设计作图中","pr":"主图A+设计需求","w":"楠楠","o":0,"u":"2026-09-14","e":"","rt":"","ps":"2026-08-31","log":"11.2-出首版附图，并开始修改首图  10.30-出首版首图  10.22 公司设计（罗罗）开始作图","fin":"","sh":"","sub":"进行中","l":"2026-10-25","f":"2026-09-10","h":"2026-11-02","sd":"2026-08-20","bk":"2026-09-15","c":"MUXHOMO","q":"15个印花"},{"id":"tAl2e5kezN","n":"MUXHOMO-280g仿羊绒复古波斯地毯-US","s":"内容阶段","p":"未开始","pr":"主图A+设计需求","w":"","o":0,"u":"","e":"","rt":"","ps":"","log":"","fin":"","sh":"","sub":"","l":"","f":"","h":"","sd":"","bk":"","c":"MUXHOMO","q":""},{"id":"tIqURhna1w","n":"MUXHOMO-280g仿羊绒抽象01地毯-US","s":"内容阶段","p":"未开始","pr":"主图A+设计需求","w":"楠楠","o":0,"u":"","e":"","rt":"","ps":"2026-11-09","log":"完成拍摄样需求","fin":"","sh":"","sub":"","l":"2027-01-14","f":"2026-11-30","h":"","sd":"2026-11-09","bk":"2026-12-05","c":"MUXHOMO","q":"13个色 14个尺寸"},{"id":"tx4H7gyH60","n":"JOLLYVOGUE-280g乡村复古仿羊绒海绵印花地毯-US","s":"拍摄阶段","p":"产品拍摄中","pr":"主附图需求","w":"文姐","o":0,"u":"2026-09-24","e":"","rt":"","ps":"2026-09-21","log":"10.24 大鹏已拍完，修图调色中","fin":"","sh":"2026-11-07","sub":"","l":"2026-12-05","f":"2026-10-21","h":"2026-06-15","sd":"2026-09-30","bk":"2026-10-26","c":"JOLLYVOGUE-US","q":"新增8个印花+之前8个印花加圆形尺寸"},{"id":"uRQjrMIymv","n":"JOLLYVOGUE-木耳边泡泡纱被套三件套-US","s":"内容阶段","p":"作图需求编写中","pr":"主图A+设计需求","w":"晓晓","o":1,"u":"","e":"","rt":"","ps":"2026-11-09","log":"","fin":"","sh":"","sub":"","l":"2027-01-15","f":"2026-12-01","h":"","sd":"2026-11-10","bk":"2026-12-06","c":"DAMAIJI-US","q":"15个色，2个版本"},{"id":"vTv9ytlj6h","n":"Sasttie-水洗棉被子七件套-US","s":"拍摄阶段","p":"等待拍摄样","pr":"新增变体（需拍摄）","w":"晓晓","o":1,"u":"2026-11-03","e":"","rt":"","ps":"2026-11-02","log":"","fin":"","sh":"","sub":"","l":"2027-01-04","f":"2026-11-20","h":"2026-05-12","sd":"2026-10-30","bk":"2026-11-25","c":"MMT_SASTTIE-US","q":"18个色小床作图+调色"}];
+var DATA_DATE='2026-11-09 10:04';
+/* 设计卡点时间统计专用数据源：钉钉「新品&新增变体时间节点视图 (副本)」29K13XF
+   只供「设计卡点」页使用；主工作台的需求清单/卡点分析仍只读 SEED。
+   钉钉视图配置不由此文件改动，仅通过 _refresh.sh 只读拉取。 */
+var DESIGN_SEED=[{"id":"40d49pvEo2","n":"SASTTIE-280g仿羊绒花卉边框地毯-WMT","s":"已完成","p":"已完成","pr":"沃尔玛-主图设计需求","w":"文姐","o":0,"u":"2026-06-24","e":"","rt":"","ps":"2026-07-06","log":"","fin":"","sh":"","sub":"待安排","l":"2026-09-13","f":"2026-07-30","h":"2026-09-02","sd":"2026-07-09","bk":"2026-08-04","c":"WMT_SASTTIE-US","q":""},{"id":"863nFdx7mN","n":"HUXMEYSON-针织毛圈棉拖-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"楠楠","o":0,"u":"2026-09-03","e":"","rt":"2026-07-20","ps":"2026-08-17","log":"","fin":"2026-10-21","sh":"2026-09-12","sub":"计划中","l":"2026-10-15","f":"2026-08-31","h":"2026-10-18","sd":"2026-08-10","bk":"2026-09-05","c":"HUXMEYSON-US","q":"9个颜色"},{"id":"9Zg1Kpc9VB","n":"JOLLYVOGUE-280g仿羊绒多花卉地毯-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"晓晓","o":1,"u":"2026-07-09","e":"","rt":"2026-06-29","ps":"2026-06-22","log":"","fin":"2026-09-09","sh":"2026-08-06","sub":"已完成","l":"2026-08-20","f":"2026-07-06","h":"2026-08-18","sd":"2026-06-15","bk":"2026-07-11","c":"JOLLYVOGUE-US","q":""},{"id":"BfFmPjdY5z","n":"Sasttie-化纤阅读枕-US","s":"已完成","p":"已完成","pr":"主图A+优化需求","w":"晓晓","o":1,"u":"2026-08-26","e":"","rt":"","ps":"2026-08-18","log":"11.2 本周或下周开始作图 10.27 公司设计排期中","fin":"2026-11-05","sh":"2026-08-26","sub":"已完成","l":"2026-10-25","f":"2026-09-10","h":"2026-10-28","sd":"2026-08-20","bk":"2026-09-15","c":"MMT_SASTTIE-US","q":"新的加大尺寸"},{"id":"Bn1Jl327CM","n":"JOLLYVOGUE-280g仿羊绒复古抽象地毯-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"诗雨","o":0,"u":"2026-09-16","e":"","rt":"2026-07-29","ps":"2026-08-10","log":"10.26 A+确认，开始贴图\n10.21 A+场景排版制作中，预计本周返A+\n10.19 确认主图场景和排版","fin":"2026-10-30","sh":"2026-10-09","sub":"已完成","l":"2026-10-22","f":"2026-09-07","h":"2026-10-26","sd":"2026-08-17","bk":"2026-09-12","c":"JOLLYVOGUE-US","q":"10个印花"},{"id":"DuewWOKeRY","n":"Sasttie-长毛绒狗窝-WMT","s":"已完成","p":"已完成","pr":"沃尔玛-主图设计需求","w":"文姐","o":0,"u":"2026-05-19","e":"","rt":"","ps":"2026-05-18","log":"","fin":"","sh":"","sub":"已完成","l":"2026-07-23","f":"2026-06-08","h":"2026-08-20","sd":"2026-05-18","bk":"2026-06-13","c":"WMT_SASTTIE-US","q":""},{"id":"G67R7C5mNg","n":"HUXMEYSON-麂皮毛圈拖鞋-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"楠楠","o":0,"u":"2026-09-03","e":"","rt":"2026-08-17","ps":"2026-08-10","log":"10.22已确认主图A+排版，调色优化中","fin":"2026-10-23","sh":"2026-09-12","sub":"","l":"2026-10-12","f":"2026-08-28","h":"2026-10-25","sd":"2026-08-07","bk":"2026-09-02","c":"HUXMEYSON-US","q":"7个颜色"},{"id":"JLXBUAKgCa","n":"JOLLYVOGUE-格子条纹圆网印花被子七件套-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"楠楠","o":0,"u":"2026-08-21","e":"","rt":"2026-06-27","ps":"2026-07-20","log":"","fin":"2026-09-29","sh":"2026-09-12","sub":"已完成","l":"2026-09-19","f":"2026-08-05","h":"2026-09-13","sd":"2026-07-15","bk":"2026-08-10","c":"DAMAIJI","q":"14个印花"},{"id":"JPFHVes5Jz","n":"OMYSTYLE-沙滩内胆包-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"晓晓","o":1,"u":"2026-06-18","e":"","rt":"2026-06-16","ps":"2026-06-22","log":"","fin":"2026-08-24","sh":"2026-08-10","sub":"已完成","l":"2026-08-07","f":"2026-06-23","h":"2026-08-18","sd":"2026-06-02","bk":"2026-06-28","c":"OMYSTYLEFASHION-US","q":""},{"id":"JPbljRovsv","n":"JOLLYVOGUE-水洗剪花被子七件套-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"晓晓","o":1,"u":"2026-05-27","e":"","rt":"","ps":"2026-04-20","log":"","fin":"2026-08-11","sh":"2026-06-09","sub":"已完成","l":"2026-08-07","f":"2026-06-01","h":"2026-07-29","sd":"2026-06-02","bk":"2026-06-28","c":"JOLLYVOGUE-US","q":""},{"id":"Mhf0fiS7tJ","n":"SASTTIE-280g仿羊绒碎花地毯-WMT","s":"已完成","p":"已完成","pr":"沃尔玛-主图设计需求","w":"文姐","o":0,"u":"2026-06-23","e":"","rt":"","ps":"2026-06-23","log":"","fin":"","sh":"","sub":"","l":"2026-08-09","f":"2026-06-25","h":"2026-08-28","sd":"2026-06-04","bk":"2026-06-30","c":"WMT_SASTTIE-US","q":""},{"id":"O624koCNLZ","n":"JOLLYVOGUE-印花儿童被套三件套-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"文姐","o":0,"u":"2026-06-09","e":"","rt":"2026-05-26","ps":"2026-06-08","log":"","fin":"2026-08-20","sh":"2026-06-24","sub":"已完成","l":"2026-08-10","f":"2026-06-26","h":"2026-07-31","sd":"2026-06-05","bk":"2026-07-01","c":"DAMAIJI-US","q":""},{"id":"QB2X0blYNb","n":"Sasttie-竹纤维被套三件套-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"诗雨","o":0,"u":"2026-07-23","e":"","rt":"2026-06-27","ps":"2026-07-13","log":"","fin":"2026-10-15","sh":"2026-08-27","sub":"已完成","l":"2026-10-09","f":"2026-08-25","h":"2026-10-06","sd":"2026-08-04","bk":"2026-08-30","c":"MMT_SASTTIE-US","q":""},{"id":"Qg0iv5o8qW","n":"OMYSTYLE-沙滩包配件-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"晓晓","o":1,"u":"2026-07-23","e":"","rt":"2026-06-29","ps":"2026-06-29","log":"","fin":"2026-08-28","sh":"2026-08-12","sub":"已完成","l":"2026-08-12","f":"2026-06-28","h":"2026-07-19","sd":"2026-06-07","bk":"2026-07-03","c":"FA-OMYSTYLE","q":""},{"id":"RdcgmKNyxH","n":"Sasttie-竹纤维床单床笠四件套-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"诗雨","o":0,"u":"2026-07-23","e":"","rt":"2026-06-27","ps":"2026-07-06","log":"","fin":"2026-09-23","sh":"2026-09-02","sub":"已完成","l":"2026-09-24","f":"2026-08-10","h":"2026-10-05","sd":"2026-07-20","bk":"2026-08-15","c":"MMT_SASTTIE-US","q":""},{"id":"SBpS6ja5pT","n":"Sasttie-可穿戴电热毯-WMT","s":"已完成","p":"已完成","pr":"沃尔玛-主图设计需求","w":"文姐","o":0,"u":"2026-06-23","e":"","rt":"","ps":"2026-07-20","log":"","fin":"","sh":"","sub":"","l":"2026-09-05","f":"2026-07-22","h":"2026-09-14","sd":"2026-07-01","bk":"2026-07-27","c":"WMT_SASTTIE-US","q":""},{"id":"SCtluYRy67","n":"Sasttie-舒棉绒单色提花地毯-US","s":"已完成","p":"已完成","pr":"主图A+设计需求","w":"文姐","o":0,"u":"2026-09-16","e":"","rt":"","ps":"2026-08-01","log":"","fin":"2026-10-12","sh":"2026-09-23","sub":"已完成","l":"2026-10-04","f":"2026-08-20","h":"2026-10-07","sd":"2026-07-30","bk":"2026-08-25","c":"MMT_SASTTIE-US","q":"7个颜色"},{"id":"Wbf1fgWesK","n":"MUXHOMO-剪花被套三件套-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"楠楠","o":0,"u":"2026-07-06","e":"","rt":"2026-06-10","ps":"2026-06-29","log":"","fin":"2026-09-17","sh":"2026-08-03","sub":"已完成","l":"2026-09-06","f":"2026-07-04","h":"2026-09-12","sd":"2026-07-02","bk":"2026-07-28","c":"MUXHOMO-US","q":""},{"id":"ZrC28rIrZ2","n":"HUXMEYSON-D4纱杂色浴室垫套装-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"晓晓","o":1,"u":"2026-07-30","e":"","rt":"2026-05-26","ps":"2026-06-29","log":"","fin":"2026-09-20","sh":"2026-08-20","sub":"计划中","l":"2026-08-20","f":"2026-06-29","h":"2026-08-21","sd":"2026-06-15","bk":"2026-07-11","c":"HUXMEYSON-US","q":""},{"id":"aUITjgJoKS","n":"SASTTIE-簇绒被子三件套-WMT","s":"已完成","p":"已完成","pr":"沃尔玛-主图设计需求","w":"文姐","o":0,"u":"2026-06-23","e":"","rt":"","ps":"2026-07-06","log":"11.2-排版确定，开始每个颜色换排版","fin":"","sh":"","sub":"","l":"2026-09-24","f":"2026-08-10","h":"2026-10-16","sd":"2026-07-20","bk":"2026-08-15","c":"WMT_SASTTIE-US","q":"20个颜色"},{"id":"avhSFG4Oqb","n":"JOLLYVOGUE-280g仿羊绒碎花地毯-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"晓晓","o":1,"u":"2026-07-30","e":"","rt":"","ps":"2026-06-22","log":"","fin":"2026-09-02","sh":"2026-08-01","sub":"","l":"2026-08-20","f":"2026-07-06","h":"2026-08-11","sd":"2026-06-15","bk":"2026-07-11","c":"JOLLYVOGUE-US","q":""},{"id":"buuDK4dmP3","n":"Sasttie-六边形夹棉防水床笠-WMT","s":"数据追踪","p":"数据追踪中","pr":"沃尔玛-主图设计需求","w":"文姐","o":0,"u":"2026-05-19","e":"","rt":"","ps":"2026-05-18","log":"","fin":"","sh":"","sub":"已完成","l":"2026-07-16","f":"2026-06-01","h":"2026-08-21","sd":"2026-05-11","bk":"2026-06-06","c":"WMT_SASTTIE-US","q":""},{"id":"cprBMsB5Mv","n":"Sasttie-针织毛圈拖鞋-WMT","s":"数据追踪","p":"数据追踪中","pr":"沃尔玛-主图设计需求","w":"楠楠","o":0,"u":"2026-10-23","e":"","rt":"","ps":"2026-10-23","log":"10.27 返首版主图，并按要求修改 外包设计排期中","fin":"","sh":"","sub":"","l":"","f":"","h":"2026-10-26","sd":"","bk":"","c":"","q":"5个颜色"},{"id":"dRgZjc2GL7","n":"Sasttie-泡泡纱被子七件套-WMT","s":"已完成","p":"已完成","pr":"沃尔玛-主图设计需求","w":"文姐","o":0,"u":"2026-05-19","e":"","rt":"","ps":"2026-05-25","log":"","fin":"","sh":"","sub":"已完成","l":"2026-08-06","f":"2026-06-22","h":"2026-08-30","sd":"2026-06-01","bk":"2026-06-27","c":"WMT_SASTTIE-US","q":""},{"id":"fv7dw5c2zq","n":"Sasttie-280g仿羊绒波斯01地毯-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"诗雨","o":0,"u":"2026-09-12","e":"","rt":"2026-07-31","ps":"2026-08-17","log":"10.26 确认调色参考，开始批量调色\n10.22 主图a+已确认，待贴图","fin":"2026-10-28","sh":"2026-10-16","sub":"已完成","l":"2026-10-15","f":"2026-08-31","h":"2026-10-14","sd":"2026-08-10","bk":"2026-09-05","c":"MMT_SASTTIE-US","q":"15个印花"},{"id":"gojgEZ9qLe","n":"Sasttie-长城格压花立体枕-WMT","s":"已完成","p":"已完成","pr":"沃尔玛-主图设计需求","w":"文姐","o":0,"u":"2026-05-19","e":"","rt":"","ps":"2026-05-18","log":"","fin":"","sh":"","sub":"已完成","l":"2026-07-23","f":"2026-06-08","h":"2026-07-30","sd":"2026-05-18","bk":"2026-06-13","c":"WMT_SASTTIE-US","q":""},{"id":"hSVXMc9biw","n":"Sasttie-雪尼尔浴室垫-WMT","s":"已完成","p":"已完成","pr":"沃尔玛-主图设计需求","w":"文姐","o":0,"u":"2026-05-19","e":"","rt":"","ps":"2026-05-18","log":"","fin":"2026-07-07","sh":"","sub":"已完成","l":"2026-06-25","f":"2026-05-11","h":"2026-07-09","sd":"2026-04-20","bk":"2026-05-16","c":"WMT_SASTTIE-US","q":""},{"id":"hbVy9gC8nU","n":"JOLLYVOGUE-大花数码印花被套三件套-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"晓晓","o":1,"u":"2026-09-16","e":"","rt":"","ps":"2026-09-14","log":"10.27 诗童做完豹纹做大花","fin":"2026-10-30","sh":"2026-10-09","sub":"待安排","l":"2026-10-30","f":"2026-09-15","h":"2026-11-03","sd":"2026-08-25","bk":"2026-09-20","c":"","q":"6个花色"},{"id":"i0VUdQeJM0","n":"JOLLYVOGUE-水洗剪花被子三件套-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"晓晓","o":1,"u":"2026-05-27","e":"","rt":"","ps":"2026-04-20","log":"","fin":"2026-08-07","sh":"2026-06-09","sub":"已完成","l":"2026-08-07","f":"2026-06-01","h":"2026-07-23","sd":"2026-06-02","bk":"2026-06-28","c":"JOLLYVOGUE-US","q":""},{"id":"i27VjKNfPj","n":"JOLLYVOGUE-280g仿羊绒花卉边框地毯-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"晓晓","o":1,"u":"2026-07-30","e":"","rt":"","ps":"2026-06-22","log":"","fin":"2026-09-22","sh":"2026-08-31","sub":"","l":"2026-08-20","f":"2026-07-06","h":"2026-08-15","sd":"2026-06-15","bk":"2026-07-11","c":"JOLLYVOGUE-US","q":""},{"id":"i6Nt8JvgAf","n":"MUXHOMO-色织纯棉被套三件套-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"楠楠","o":0,"u":"2026-07-30","e":"","rt":"2026-06-27","ps":"2026-07-06","log":"10.26 确定颜色，开始调色 10.24确定主图A+版式，开始套版换花色 10.20公司设计（啦啦）开始作图","fin":"2026-10-30","sh":"2026-10-09","sub":"计划中","l":"2026-10-18","f":"2026-09-03","h":"2026-10-22","sd":"2026-08-13","bk":"2026-09-08","c":"MUXHOMO","q":"19个印花"},{"id":"icr2dW31iI","n":"JOLLYVOGUE-簇绒被子三件套-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"诗雨","o":0,"u":"2026-07-07","e":"","rt":"2026-06-26","ps":"2026-06-29","log":"10.24 已返大部分图，待调补拍首图\n10.22 深色已调完，正在调浅色，补拍的首图下周安排调色\n10.19 确定调色参考","fin":"2026-10-23","sh":"2026-10-28","sub":"已完成","l":"2026-09-24","f":"2026-08-10","h":"2026-10-06","sd":"2026-07-20","bk":"2026-08-15","c":"JOLLYVOGUE-US","q":"20个颜色"},{"id":"ix0ln7Qnke","n":"JOLLYVOGUE-豹纹数码印花被套三件套-US","s":"已完成","p":"已完成","pr":"主图A+设计需求","w":"晓晓","o":1,"u":"2026-09-16","e":"","rt":"2026-08-03","ps":"2026-09-07","log":"10.27 A+制作中  10.26 主图调完色        10-22 诗童首版主图作图中","fin":"2026-10-28","sh":"2026-10-06","sub":"待安排","l":"2026-10-30","f":"2026-09-15","h":"2026-10-18","sd":"2026-08-25","bk":"2026-09-20","c":"DAMAIJI","q":"6个花色"},{"id":"kMWWEg6Ksr","n":"Sasttie-珊瑚绒浴巾4枚装-WMT","s":"已完成","p":"已完成","pr":"沃尔玛-主图设计需求","w":"文姐","o":0,"u":"2026-06-23","e":"","rt":"","ps":"2026-07-06","log":"","fin":"","sh":"","sub":"","l":"2026-08-16","f":"2026-07-02","h":"2026-08-27","sd":"2026-06-11","bk":"2026-07-07","c":"WMT_SASTTIE-US","q":""},{"id":"lVIrwSQ8xx","n":"JOLLYVOGUE-植物花卉数码印花被套三件套-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"晓晓","o":1,"u":"2026-06-22","e":"","rt":"2026-06-29","ps":"2026-06-15","log":"","fin":"2026-08-11","sh":"2026-08-01","sub":"已完成","l":"2026-07-23","f":"2026-06-08","h":"2026-07-24","sd":"2026-05-18","bk":"2026-06-13","c":"DAMAIJI-US","q":""},{"id":"lermXzvNnw","n":"HUXMEYSON-宽条绒棉拖-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"晓晓","o":1,"u":"2026-05-21","e":"","rt":"2026-04-22","ps":"2026-05-11","log":"","fin":"2026-08-04","sh":"2026-06-06","sub":"已完成","l":"2026-07-16","f":"2026-06-01","h":"2026-07-07","sd":"2026-05-11","bk":"2026-06-06","c":"HUXMEYSON-US","q":""},{"id":"mGvXPv3NkA","n":"HUXMEYSON-羊绒全包拖鞋-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"诗雨","o":0,"u":"2026-08-21","e":"","rt":"2026-07-18","ps":"2026-07-27","log":"","fin":"2026-10-20","sh":"2026-09-12","sub":"计划中","l":"2026-10-15","f":"2026-08-31","h":"2026-10-12","sd":"2026-08-10","bk":"2026-09-05","c":"HUXMEYSON-US","q":"14个颜色"},{"id":"mPe82rthd3","n":"JOLLYVOGUE-圆网木耳边格子床单四件套-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"楠楠","o":0,"u":"2026-08-31","e":"","rt":"2026-06-29","ps":"2026-07-20","log":"","fin":"2026-10-21","sh":"2026-10-06","sub":"","l":"2026-09-27","f":"2026-08-13","h":"2026-10-14","sd":"2026-07-23","bk":"2026-08-18","c":"DAMAIJI-US","q":"10个印花"},{"id":"mTZkYSW3YF","n":"Sasttie-碎记忆棉枕-WMT","s":"已完成","p":"已完成","pr":"沃尔玛-主图设计需求","w":"文姐","o":0,"u":"2026-06-23","e":"","rt":"","ps":"2026-06-29","log":"","fin":"","sh":"","sub":"取消","l":"2026-08-10","f":"2026-06-26","h":"2026-08-18","sd":"2026-06-05","bk":"2026-07-01","c":"WMT_SASTTIE-US","q":""},{"id":"nGKvEVq9by","n":"Sasttie-短款可穿毯-WMT","s":"已完成","p":"已完成","pr":"沃尔玛-主图设计需求","w":"文姐","o":0,"u":"2026-06-25","e":"","rt":"","ps":"2026-08-03","log":"","fin":"","sh":"","sub":"","l":"2026-10-05","f":"2026-08-21","h":"2026-10-17","sd":"2026-07-31","bk":"2026-08-26","c":"WMT_SASTTIE-US","q":""},{"id":"oYo5WbBTgf","n":"Sasttie-竹纤维枕套-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"诗雨","o":0,"u":"2026-07-23","e":"","rt":"2026-06-27","ps":"2026-07-06","log":"","fin":"2026-10-15","sh":"2026-09-02","sub":"计划中","l":"2026-10-03","f":"2026-08-19","h":"2026-09-26","sd":"2026-07-29","bk":"2026-08-24","c":"MMT_SASTTIE-US","q":""},{"id":"osSGNxFrEP","n":"Sasttie-280g仿羊绒海绵航海风印花地毯-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"文姐","o":0,"u":"2026-07-09","e":"","rt":"2026-06-01","ps":"2026-06-08","log":"","fin":"2026-08-29","sh":"2026-07-18","sub":"已完成","l":"2026-08-02","f":"2026-06-18","h":"2026-07-13","sd":"2026-05-28","bk":"2026-06-23","c":"MMT_SASTTIE-US","q":""},{"id":"pVNrZMeOOL","n":"JOLLYVOGUE-华夫格被套三件套-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"文姐","o":0,"u":"2026-06-08","e":"","rt":"2026-04-25","ps":"2026-06-01","log":"","fin":"2026-07-29","sh":"2026-06-23","sub":"已完成","l":"2026-08-06","f":"2026-06-15","h":"2026-07-29","sd":"2026-06-01","bk":"2026-06-27","c":"DAMAIJI-US","q":""},{"id":"pqk7YKp5IJ","n":"Sasttie-化纤床头靠枕-WMT","s":"已完成","p":"已完成","pr":"沃尔玛-主图设计需求","w":"文姐","o":0,"u":"2026-04-30","e":"","rt":"","ps":"2026-04-27","log":"","fin":"","sh":"","sub":"进行中","l":"2026-07-12","f":"2026-05-28","h":"2026-07-24","sd":"2026-05-07","bk":"2026-06-02","c":"WMT_SASTTIE-US","q":""},{"id":"qo2E86fM5x","n":"JOLLYVOGUE-波西米亚数码印花被子七件套-US","s":"已完成","p":"已完成","pr":"主图A+设计需求","w":"晓晓","o":1,"u":"2026-05-18","e":"","rt":"","ps":"2026-04-06","log":"","fin":"2026-07-03","sh":"2026-06-09","sub":"已完成","l":"2026-06-22","f":"2026-04-29","h":"2026-06-13","sd":"2026-04-17","bk":"2026-05-13","c":"JOLLYVOGUE-US","q":""},{"id":"r6Ad1H982C","n":"JOLLYVOGUE-波点羊羔绒被子三件套-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"楠楠","o":0,"u":"2026-09-12","e":"","rt":"2026-07-28","ps":"2026-08-24","log":"","fin":"2026-10-20","sh":"2026-10-08","sub":"进行中","l":"2026-10-14","f":"2026-08-30","h":"2026-09-30","sd":"2026-08-09","bk":"2026-09-04","c":"DAMAIJI","q":"5个颜色"},{"id":"ukBxlfTAyR","n":"JOLLYVOGUE-宽条绒被子三件套-US","s":"数据追踪","p":"数据追踪中","pr":"主图A+设计需求","w":"诗雨","o":0,"u":"2026-08-03","e":"","rt":"2026-06-29","ps":"2026-07-27","log":"10.27 主图调色完，部分需修改\n10.22 确认调色参考，等待批量调色\n10.19 确认主图排版，开始调色","fin":"2026-10-29","sh":"2026-09-12","sub":"已完成","l":"2026-10-10","f":"2026-08-26","h":"2026-10-21","sd":"2026-08-05","bk":"2026-08-31","c":"DAMAIJI-US","q":"10个颜色"},{"id":"vNGYkK7UC5","n":"Sasttie-磨毛印花被子七件套-WMT","s":"已完成","p":"已完成","pr":"沃尔玛-主图设计需求","w":"文姐","o":0,"u":"2026-06-23","e":"","rt":"","ps":"2026-06-29","log":"","fin":"","sh":"","sub":"已完成","l":"2026-08-10","f":"2026-06-26","h":"2026-05-07","sd":"2026-06-05","bk":"2026-07-01","c":"WMT_SASTTIE-US","q":""},{"id":"vzD3pkXPhX","n":"JOLLYVOGUE -兔毛豹纹半包拖鞋-US","s":"已完成","p":"已完成","pr":"主图A+设计需求","w":"晓晓","o":1,"u":"2026-04-15","e":"","rt":"","ps":"2026-04-20","log":"","fin":"2026-07-18","sh":"2026-05-12","sub":"计划中","l":"2026-06-18","f":"2026-05-04","h":"2026-06-23","sd":"2026-04-13","bk":"2026-05-09","c":"JOLLYVOGUE-US","q":""},{"id":"xHYaz2ZeSH","n":"Sasttie-18mm记忆棉浴室垫套装-WMT","s":"已完成","p":"已完成","pr":"沃尔玛-主图设计需求","w":"文姐","o":0,"u":"2026-06-18","e":"","rt":"","ps":"2026-07-06","log":"","fin":"","sh":"","sub":"已完成","l":"2026-08-17","f":"2026-07-03","h":"2026-09-27","sd":"2026-06-12","bk":"2026-07-08","c":"WMT_SASTTIE-US","q":""},{"id":"xNLdkDsOrm","n":"Sasttie-泡泡纱木耳边被子三件套-WMT","s":"已完成","p":"已完成","pr":"沃尔玛-主图设计需求","w":"文姐","o":0,"u":"2026-06-18","e":"","rt":"","ps":"2026-06-22","log":"","fin":"","sh":"","sub":"已完成","l":"2026-08-09","f":"2026-06-25","h":"2026-08-13","sd":"2026-06-04","bk":"2026-06-30","c":"WMT_SASTTIE-US","q":""}];
+var STAGE_OF={
+  '未开始':'内容阶段','BOM信息整理中':'内容阶段','提交寄样需求':'内容阶段','作图需求编写中':'内容阶段',
+  '文案撰写中':'内容阶段','剪辑需求编写中':'内容阶段',
+  '等待拍摄样':'拍摄阶段','机构排期中':'拍摄阶段','拍摄机构排期中':'拍摄阶段','产品拍摄中':'拍摄阶段','等待拍摄返图':'拍摄阶段',
+  '设计排期中':'设计阶段','设计作图中':'设计阶段','视频剪辑中':'设计阶段',
+  '待检查链接':'设计阶段'
+};
+var PROGRESS=['未开始','BOM信息整理中','提交寄样需求','作图需求编写中','文案撰写中','剪辑需求编写中',
+  '等待拍摄样','拍摄机构排期中','产品拍摄中','等待拍摄返图','设计排期中','设计作图中','视频剪辑中','待检查链接'];
+var BLOCK_OF={
+  '等待拍摄样':{o:'外部·采购寄样',at:'样品未到',w:'样品没到，拍摄排不上'},
+  '等待拍摄返图':{o:'外部·摄影机构',at:'等机构返图',w:'已拍完，等机构返图'},
+  '机构排期中':{o:'外部·摄影机构',at:'机构档期未定',w:'机构档期未定，拍摄时间不可控'},
+  '拍摄机构排期中':{o:'外部·摄影机构',at:'机构档期未定',w:'机构档期未定，拍摄时间不可控'},
+  '产品拍摄中':{o:'外部·摄影机构',at:'拍摄中',w:'正在拍，等出片'},
+  '设计排期中':{o:'外部·设计部门',at:'等设计排期',w:'需求已提交设计表，等设计排期'},
+  '设计作图中':{o:'外部·设计部门',at:'设计中',w:'设计中，等出图'},
+  '作图需求编写中':{o:'我·自己',at:'作图需求未写完',w:'需求文档还没写完，卡在自己手上'},
+  '文案撰写中':{o:'我·自己',at:'文案未写完',w:'文案还没写完，卡在自己手上'},
+  '剪辑需求编写中':{o:'我·自己',at:'剪辑需求未写',w:'剪辑需求还没写，卡在自己手上'},
+  '视频剪辑中':{o:'我·自己',at:'剪辑进行中',w:'剪辑进行中'},
+  '待检查链接':{o:'我·自己',at:'链接待检查',w:'上架前最后一关，需要检查链接'},
+  '未开始':{o:'未启动',at:'尚未启动',w:'还没开始，可能等前置或没排上'},
+  'BOM信息整理中':{o:'我·自己',at:'BOM未整理完',w:'BOM 信息还没整理完'},
+  '提交寄样需求':{o:'我·自己',at:'寄样需求未提交',w:'寄样需求还没提交'}
+};
+var STALL={'内容阶段':21,'拍摄阶段':30,'设计阶段':21};
+var PRE=['内容阶段','拍摄阶段','设计阶段'];
+/* ===== 双时间锚点进度把控（仅上架前阶段）=====
+   首批出货 F / 进仓 W。各阶段对应红线：
+     内容阶段 → 需求撰写完成，截止 F-14（出货前两周）
+     拍摄阶段 → 样品寄出，截止 F-21（出货前三周）；样品已到的状态不判逾期
+     设计阶段 → 设计出图，截止 W（进仓前）；无进仓时用预计上架兜底  */
+var RED_OF={'内容阶段':{k:'f',off:-14,name:'需求撰写'},'拍摄阶段':{k:'f',off:-21,name:'样品寄出'},
+  '设计阶段':{k:'h',off:0,name:'设计出图'}};
+/* 样品已到 = 已经开拍或拍完等返图，寄样节点已完成，不再追究寄样逾期 */
+var SAMPLE_ARRIVED=['产品拍摄中','等待拍摄返图'];
+var RED_LABEL={R1:'红线已破',R2:'红线告急',R3:'红线临近',R0:'缺时间锚点',RS:'安全'};
+var RED_ORDER=['R1','R2','R3','R0','RS'];
+/* 部门成员（钉钉内容运营部） */
+var MEMBERS=['晓晓','文姐','诗雨','楠楠'];
+var OWNER_LABEL={'晓晓':'我·自己','文姐':'文姐','诗雨':'诗雨','楠楠':'楠楠'};
+var BLOCK_ORDER=['外部·设计部门','外部·摄影机构','外部·采购寄样','我·自己','诗雨','楠楠','文姐','未分配','未启动'];
+var RISK_LABEL={R1:'红线已破',R2:'红线告急',R3:'红线临近',R0:'缺时间锚点',
+  S2:'交付已逾期',S4:'停滞',S5:'久未启动',S9:'排期待核对',
+  S7:'卡在自己手上',S8:'外部依赖中',S10:'同事跟进中',OK:'正常'};
+var RISK_ORDER=['R1','R2','R3','R0','S2','S9','S4','S5','S7','S10','S8','OK'];
+var STAGE_ORDER=['内容阶段','拍摄阶段','设计阶段'];
+
+var DEFAULT_LINKS=[
+ {n:'新品&新增变体时间节点视图',u:'https://alidocs.dingtalk.com/i/nodes/P7QG4Yx2JpKrZmKgCeBxb4rGV9dEq3XD?entrance=data&sheetId=hERWDMS&viewId=eG9FNYm'},
+ {n:'内容运营-部门总表',u:'https://alidocs.dingtalk.com/i/nodes/P7QG4Yx2JpKrZmKgCeBxb4rGV9dEq3XD'},
+ {n:'新品全链路进度表',u:'https://alidocs.dingtalk.com/i/nodes/QG53mjyd80LoqbL3flwAPrxw86zbX04v'},
+ {n:'老品需求',u:'https://alidocs.dingtalk.com/i/nodes/6LeBq413JALlj3L6fBqBAdQmVDOnGvpb'},
+ {n:'辅料及拍照样同频表',u:'https://alidocs.dingtalk.com/i/nodes/r1R7q3QmWeNQ9xNGSZjmZKa4VxkXOEP2'},
+ {n:'亚马逊产品进度-2026',u:'https://alidocs.dingtalk.com/i/nodes/Y1OQX0akWmmMpRmvsaLL3g9wWGlDd3mE'},
+ {n:'设计总需求对接',u:'https://alidocs.dingtalk.com/i/nodes/jb9Y4gmKWrvpm3vjf9bEBg01WGXn6lpz'},
+ {n:'查船期',u:''},{n:'九数云',u:''}
+];
+
+/* ========== 状态 ========== */
+var DATA=[],LINKS=[];
+var view='mine', statusFilter='all', sel={type:null,val:null}, pane='list';
+var editId=null, limit=40;
+var pendingToast='';
+
+/* ========== 数据层 ========== */
+var KEY='wb_amzreq_v4', KEYL='wb_amzreq_links_v2', KEYS='wb_amzreq_seedd_v4';
+/* 钉钉快照优先：HTML 里的 DATA_DATE 变了就说明脚本刷新过，用新 SEED 覆盖；
+   但页面里手动新增/编辑过的条目（m:1）会保留，不会丢 */
+function loadData(){
+  var sd='', old=[];
+  try{sd=localStorage.getItem(KEYS)||'';}catch(e){}
+  try{var raw=localStorage.getItem(KEY);if(raw){var a=JSON.parse(raw);if(Array.isArray(a))old=a;}}catch(e){}
+  var manual=old.filter(function(x){return x&&x.m===1;});
+  if(!old.length||sd!==DATA_DATE){
+    DATA=JSON.parse(JSON.stringify(SEED));   /* 深拷贝，避免后续改动污染 SEED */
+    var kept=0,merged=0;
+    manual.forEach(function(mm){
+      if(!mm||!mm.n)return;
+      var hit=-1;
+      for(var i=0;i<DATA.length;i++){if(DATA[i].n===mm.n){hit=i;break;}}
+      if(hit<0){DATA.push(mm);kept++;}                       /* 钉钉没有 → 你自己新增的，保留 */
+      else if(mm.mt&&mm.mt>DATA_DATE){DATA[hit]=mm;kept++;}  /* 你改得比快照新 → 用你的 */
+      else{merged++;}                                        /* 钉钉更新了 → 以钉钉为准 */
+    });
+    saveData();
+    try{localStorage.setItem(KEYS,DATA_DATE);}catch(e){}
+    if(old.length&&sd!==DATA_DATE){
+      pendingToast='已同步钉钉 '+DATA_DATE.slice(0,10)+' 数据；保留你的改动 '+kept+' 条，'+merged+' 条以钉钉为准';
+    }
+  }else{
+    DATA=old;
+  }
+  try{
+    var rl=localStorage.getItem(KEYL);
+    LINKS=rl?JSON.parse(rl):DEFAULT_LINKS.slice();
+    if(!Array.isArray(LINKS))LINKS=DEFAULT_LINKS.slice();
+  }catch(e){LINKS=DEFAULT_LINKS.slice();}
+}
+function saveData(){
+  try{localStorage.setItem(KEY,JSON.stringify(DATA));}
+  catch(e){toast('保存失败：存储空间可能已满');}
+}
+function saveLinks(){try{localStorage.setItem(KEYL,JSON.stringify(LINKS));}catch(e){}}
+
+/* ========== 计算层 ========== */
+function todayStr(){
+  var d=new Date(),m=d.getMonth()+1,dd=d.getDate();
+  return d.getFullYear()+'-'+(m<10?'0':'')+m+'-'+(dd<10?'0':'')+dd;
+}
+/* 与 DATA_DATE 同格式，用于比较「你和钉钉谁更新」 */
+function nowStamp(){
+  var d=new Date(),p=function(x){return (x<10?'0':'')+x;};
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());
+}
+function diffD(a,b){
+  if(!a||!b)return null;
+  return Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000);
+}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+
+/* 给一条需求算阶段/卡点/风险 */
+function enrich(r){
+  var t=todayStr();
+  var stage=r.s||STAGE_OF[r.p]||'内容阶段';
+  /* 样品已到（开拍中 / 等返图）→ 寄样节点已完成，不参与逾期判定 */
+  var sampleArrived=(stage==='拍摄阶段'&&SAMPLE_ARRIVED.indexOf(r.p)>=0);
+  var b=BLOCK_OF[r.p]||{o:'未启动',at:r.p||'—',w:''};
+  var own=r.w||'';
+  /* 卡在部门内部时，按负责人细分（晓晓 / 诗雨 / 楠楠 / 文姐） */
+  var blk=b.o, blkAt=b.at;
+  if(blk==='我·自己'){
+    blk=OWNER_LABEL[own]||'未分配';
+    if(own&&own!=='晓晓')blkAt=b.at+'（'+own+'）';
+  }
+  var open=diffD(r.u,t);
+  var dExp=r.e?diffD(t,r.e):null;
+  var dLau=r.l?diffD(t,r.l):null;
+  /* 有进仓时间时，进仓就是项目结束锚点，预计上架不再参与任何判断 */
+  var dirty=!!(!r.h&&r.l&&r.u&&r.l<r.u);   /* 无进仓时才用上架兜底校验 */
+  var whLate=false;                        /* 已弃用：进仓优先，不再拿上架对比 */
+  var hLeft=r.h?diffD(t,r.h):null;         /* 距进仓天数，负数为已过 */
+  var isPre=PRE.indexOf(stage)>=0;
+
+  /* ---- 双时间锚点红线（视图内均为上架前阶段，全部适用） ----
+     内容/拍摄看首批出货；设计看项目结束锚点：有进仓用进仓，无进仓用预计上架兜底 */
+  var rc=RED_OF[stage]||RED_OF['内容阶段'];
+  var redFallback=false;
+  if(rc.k!=='f'&&!r.h&&r.l){rc={k:'h',off:0,name:'设计出图（上架兜底）'};redFallback=true;}
+  var anchor=rc.k==='f'?(r.f||''):(r.h||r.l||'');
+  var redDate='';
+  if(anchor){
+    var dt=new Date(anchor+'T00:00:00');
+    if(rc.off)dt.setDate(dt.getDate()+rc.off);
+    var pp=function(x){return (x<10?'0':'')+x;};
+    redDate=dt.getFullYear()+'-'+pp(dt.getMonth()+1)+'-'+pp(dt.getDate());
+  }
+  var redLeft=redDate?diffD(t,redDate):null;
+  if(sampleArrived){redDate='';redLeft=null;}  /* 样品已到，不再展示寄样红线日期 */
+  /* 红线日期早于需求提交日 → 需求提晚了 / 排期未同步，仍按已破线处理，但说明原因 */
+  var redDirty=!!(redDate&&r.u&&redDate<r.u);
+  var red='RS';
+  if(sampleArrived)red='RS';        /* 样品已到 → 寄样节点闭环，不判逾期 */
+  else if(redLeft===null)red='R0';
+  else if(redLeft<-90)red='R0';   /* 过期超 90 天：排期表大概率未同步，不按真破线处理 */
+  else if(redLeft<0)red='R1';
+  else if(redLeft<=7)red='R2';
+  else if(redLeft<=14)red='R3';
+  var redWhy='';
+  if(red==='R1'&&redDirty)redWhy=rc.name+'红线 '+redDate+' 早于需求提交 '+r.u+'，已过 '+(-redLeft)+' 天（需求提晚 / 排期未同步）';
+  else if(red==='R1')redWhy=rc.name+'红线 '+redDate+' 已过 '+(-redLeft)+' 天';
+  else if(red==='R2')redWhy=rc.name+'红线 '+redDate+'，仅剩 '+redLeft+' 天';
+  else if(red==='R3')redWhy=rc.name+'红线 '+redDate+'，还有 '+redLeft+' 天';
+  else if(red==='R0'){
+    if(redDirty)redWhy=rc.name+'红线('+redDate+')早于需求提交('+r.u+')，排期需核对';
+    else if(redLeft!==null)redWhy=rc.name+'红线('+redDate+')已过 '+(-redLeft)+' 天，远超正常周期，排期数据需核对';
+    else redWhy='缺'+(rc.k==='f'?'首批出货':'进仓（也无上架兜底）')+'时间，无法判红线';
+  }
+
+  var risk='OK',why='';
+  if(sampleArrived){risk='OK';why='样品已到，寄样节点已完成';}
+  else if(red==='R1'){risk='R1';why=redWhy+'；当前'+stage+'（'+b.at+'）';}
+  else if(red==='R2'){risk='R2';why=redWhy+'，当前'+stage+'（'+b.at+'）';}
+  else if(red==='R3'){risk='R3';why=redWhy;}
+  else if(red==='R0'){risk='R0';why=redWhy;}
+  else if(dirty){risk='S9';why='预计上架('+r.l+')早于需求提交('+r.u+')，排期数据需核对';}
+  else if(dExp!==null&&dExp<0){risk='S2';why='超期望完成时间 '+(-dExp)+' 天，内容交付已延期';}
+  else if(open!==null&&open>(STALL[stage]||30)){risk='S4';why='停滞 '+open+' 天（'+r.u+' 提交），超'+stage+'正常节奏 '+(open-(STALL[stage]||30))+' 天';}
+  else if(r.p==='未开始'&&open!==null&&open>14){risk='S5';why='提交 '+open+' 天仍未启动';}
+  else if(blk==='我·自己'){risk='S7';why='卡在自己手上：'+b.at;}
+  else if(MEMBERS.indexOf(blk)>=0){risk='S10';why='在'+blk+'手上：'+b.at+'，需跟进';}
+  else if(blk.indexOf('外部')===0){risk='S8';why='外部依赖中：'+b.at+'（'+b.w+'）';}
+  /* 卡片下方红条已展示红线日期与逾期天数，这里只留卡点描述，避免同一句话出现两次 */
+  var cardWhy=why;
+  if(redWhy&&why.indexOf(redWhy)===0)cardWhy=why.slice(redWhy.length).replace(/^[；，,\s]+/,'');
+
+  var urgent=(risk==='R1'||risk==='R2'||risk==='S2'||risk==='S7');
+  return {r:r,stage:stage,blk:blk,owner:own,blkAt:blkAt,blkWhy:b.w,open:open,dExp:dExp,dLau:dLau,
+    dirty:dirty,whLate:whLate,hLeft:hLeft,risk:risk,why:why,cardWhy:cardWhy,urgent:urgent,sampleArrived:sampleArrived,
+    red:red,redName:rc.name,redDate:redDate,redLeft:redLeft,redWhy:redWhy,redDirty:redDirty,redFallback:redFallback,
+    dF:(r.f?diffD(t,r.f):null),dW:(r.h?diffD(t,r.h):null)};
+}
+function allEnriched(){return DATA.map(enrich);}
+function inScope(e){return view==='dept'?true:e.r.o===1;}
+function statusOK(e){
+  if(statusFilter==='anchor')return e.red!=='R0';
+  if(statusFilter==='noanchor')return e.red==='R0';
+  return true;
+}
+function selOK(e){
+  if(!sel.type)return true;
+  if(sel.type==='stage')return e.stage===sel.val;
+  if(sel.type==='nature')return (e.r.pr||'未填')===sel.val;
+  if(sel.type==='block')return e.blk===sel.val;
+  if(sel.type==='risk')return e.risk===sel.val;
+  if(sel.type==='red')return e.red===sel.val;
+  if(sel.type==='owner')return (e.r.w||'未分配')===sel.val;
+  return true;
+}
+function filtered(){
+  return allEnriched().filter(function(e){return inScope(e)&&statusOK(e)&&selOK(e);})
+    .sort(function(a,b){
+      var ra=RISK_ORDER.indexOf(a.risk),rb=RISK_ORDER.indexOf(b.risk);
+      if(ra!==rb)return ra-rb;
+      var da=a.dExp===null?9999:a.dExp, db=b.dExp===null?9999:b.dExp;
+      return da-db;
+    });
+}
+function scopeAll(){return allEnriched().filter(inScope);}
+
+/* ========== 渲染层 ========== */
+function renderHeader(){
+  var d=new Date();
+  document.getElementById('hdDate').textContent=(d.getMonth()+1)+'月'+d.getDate()+'日';
+  var a=allEnriched();
+  document.getElementById('cnMine').textContent=a.filter(function(e){return e.r.o===1;}).length;
+  document.getElementById('cnDept').textContent=a.length;
+  document.getElementById('vt-mine').className='vtab'+(view==='mine'?' on':'');
+  document.getElementById('vt-dept').className='vtab'+(view==='dept'?' on':'');
+  renderSyncMark();
+}
+/* 数据新鲜度：告诉用户当前看的是哪天的钉钉快照 */
+function renderSyncMark(){
+  var el=document.getElementById('hdSync');
+  if(!el)return;
+  var ds=(typeof DATA_DATE!=='undefined'?DATA_DATE:'')||'';
+  if(!ds){el.textContent='数据时间未知';el.className='ds ds-old';return;}
+  var age=-1;
+  try{
+    var t=new Date(ds.slice(0,10)+'T'+(ds.slice(11)||'00:00')+':00');
+    age=Math.floor((Date.now()-t.getTime())/3600000);
+  }catch(e){age=-1;}
+  var day=ds.slice(5,10).replace('-','月')+'日';
+  if(age<0){el.textContent='数据 '+day;el.className='ds';}
+  else if(age<20){el.textContent='数据 '+day+' · 今天更新';el.className='ds';}
+  else if(age<72){el.textContent='数据 '+day+' · '+age+' 小时前';el.className='ds stale';}
+  else{el.textContent='数据 '+day+' · '+Math.floor(age/24)+' 天前';el.className='ds ds-old';}
+  el.title='钉钉数据快照：'+ds+'。点击了解如何更新';
+}
+function syncTip(){
+  var ds=(typeof DATA_DATE!=='undefined'?DATA_DATE:'未知');
+  toast('当前数据快照：'+ds+'。让小台跑一次刷新即可更新');
+}
+function renderSidebar(){
+  var list=scopeAll();
+  /* 「我的需求」视角下按负责人筛选没有意义，隐藏该组 */
+  var owBox=document.getElementById('fgOwner').parentNode;
+  if(owBox)owBox.style.display=(view==='mine'?'none':'');
+  function countGroup(keyArr,getVal){
+    var m={};keyArr.forEach(function(k){m[k]=0;});
+    list.forEach(function(e){var v=getVal(e);if(m[v]!==undefined)m[v]++;});
+    return m;
+  }
+  /* items: [[key,label],...] —— key 用于筛选比对，label 用于显示 */
+  function draw(elId,items,getVal,type){
+    var m={};items.forEach(function(it){m[it[0]]=0;});
+    list.forEach(function(e){var v=getVal(e);if(m[v]!==undefined)m[v]++;});
+    var max=0;items.forEach(function(it){if(m[it[0]]>max)max=m[it[0]];});
+    var h='';
+    items.forEach(function(it){
+      var k=it[0],lb=it[1];
+      if(m[k]===0)return;
+      var on=(sel.type===type&&sel.val===k)?' on':'';
+      var w=max?Math.round(m[k]/max*100):0;
+      h+='<button class="fi'+on+'" onclick="setSel(\''+type+'\',\''+esc(k)+'\')">'
+        +'<span class="fi-bar"><i style="width:'+w+'%"></i></span>'
+        +'<span>'+esc(lb)+'</span><span class="fi-n">'+m[k]+'</span></button>';
+    });
+    document.getElementById(elId).innerHTML=h||'<div class="muted" style="font-size:12px;padding:4px 8px">无数据</div>';
+  }
+  /* 时间红线：只统计未完成的，已闭环的不参与 */
+  var live=list.slice();
+  var redItems=[['R1','红线已破'],['R2','7天内到期'],['R3','8-14天'],['R0','缺时间锚点'],['RS','安全']];
+  (function(){
+    var m={};redItems.forEach(function(it){m[it[0]]=0;});
+    live.forEach(function(e){if(m[e.red]!==undefined)m[e.red]++;});
+    var max=0;redItems.forEach(function(it){if(m[it[0]]>max)max=m[it[0]];});
+    var h='';
+    redItems.forEach(function(it){
+      var k=it[0],lb=it[1];
+      if(m[k]===0)return;
+      var on=(sel.type==='red'&&sel.val===k)?' on':'';
+      var w=max?Math.round(m[k]/max*100):0;
+      var cls=(k==='R1'?' fi-red':(k==='R2'?' fi-amber':''));
+      h+='<button class="fi'+on+cls+'" onclick="setSel(\'red\',\''+k+'\')">'
+        +'<span class="fi-bar"><i style="width:'+w+'%"></i></span>'
+        +'<span>'+lb+'</span><span class="fi-n">'+m[k]+'</span></button>';
+    });
+    document.getElementById('fgRed').innerHTML=h||'<div class="muted" style="font-size:12px;padding:4px 8px">无数据</div>';
+  })();
+  draw('fgStage',STAGE_ORDER.map(function(s){return [s,s];}),function(e){return e.stage;},'stage');
+  draw('fgOwner',['晓晓','诗雨','楠楠','文姐','未分配'].map(function(s){
+    return [s,(view==='dept'&&s==='晓晓')?'晓晓（我）':s];}),function(e){return e.r.w||'未分配';},'owner');
+}
+function renderStats(){
+  var l=scopeAll();
+  var mine=view==='mine';
+  var r1=l.filter(function(e){return e.red==='R1';}).length;
+  var r2=l.filter(function(e){return e.red==='R2';}).length;
+  var r0=l.filter(function(e){return e.red==='R0';}).length;
+  var h7=l.filter(function(e){return e.hLeft!==null&&e.hLeft>=0&&e.hLeft<=7;}).length;
+  var h='';
+  function st(n,la,cls){return '<div class="st '+(cls||'')+'"><div class="n">'+n+'</div><div class="l">'+la+'</div></div>';}
+  h+=st(l.length,mine?'我的新品需求':'部门新品/变体需求','');
+  h+=st(r1,'红线已破','red');
+  h+=st(r2,'7天内到期','amber');
+  h+=st(h7,'7天内进仓','amber');
+  document.getElementById('stats').innerHTML=h;
+  /* 数据缺口：缺时间锚点占比过高时提示去补排期表 */
+  var gapEl=document.getElementById('gapTip');
+  if(r0&&l.length&&r0/l.length>=0.3){
+    var u='';
+    for(var i=0;i<LINKS.length;i++){if(LINKS[i].n.indexOf('全链路')>=0){u=LINKS[i].u;break;}}
+    gapEl.innerHTML='<div class="gaptip">'
+      +'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8A5A00" stroke-width="2" stroke-linecap="round"><path d="M12 9v4"/><path d="M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg>'
+      +'<div><b>'+r0+' / '+l.length+' 条（'+Math.round(r0/l.length*100)+'%）</b>缺首批出货或进仓时间，无法判定红线。'
+      +(u?'<a href="'+esc(u)+'" target="_blank" rel="noopener">去「新品全链路进度表」补齐</a>':'')
+      +'，补齐后红线预警才覆盖完整。</div></div>';
+  }else{
+    gapEl.innerHTML='';
+  }
+}
+function renderToday(){
+  /* 不受左侧筛选影响，保证「打开就看见」；首屏只列 3 条，其余转到卡点分析页 */
+  var all=scopeAll().filter(function(e){return e.urgent;});
+  var l=all.slice(0,3);
+  var box=document.getElementById('todayBox');
+  if(!all.length){
+    box.innerHTML='<div class="today-ok">当前筛选下没有需要今天处理的需求。</div>';
+    return;
+  }
+  var h='<div class="today"><div class="today-t">'
+    +'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#A32D2D" stroke-width="2" stroke-linecap="round"><path d="M12 9v4"/><path d="M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg>'
+    +'今天要处理 · '+all.length+' 条</div>';
+  l.forEach(function(e){
+    var cls=(e.risk==='R2'||e.risk==='R3'||e.risk==='R0'||e.risk==='S7')?'t-amber':'t-red';
+    h+='<div class="ti"><div class="ti-main"><div class="ti-n">'+esc(e.r.n)+'</div>'
+      +'<div class="ti-s">'+esc(e.stage)+' · '+esc(e.r.w||'未分配')+' · '+esc(e.redName||'红线')+' '+esc(e.redDate||'')+'</div>'
+      +'</div>'
+      +'<span class="tag '+cls+'">'+esc(RISK_LABEL[e.risk])+'</span>'
+      +'<button class="btn-sm" onclick="openEdit(\''+esc(e.r.id)+'\')">去处理</button></div>';
+  });
+  if(all.length>3){
+    h+='<div style="text-align:center;padding:2px 0 4px"><button class="btn-sm" onclick="setPane(\'insight\')">还有 '+(all.length-3)+' 条 → 去卡点分析看全部</button></div>';
+  }
+  box.innerHTML=h+'</div>';
+}
+function renderList(){
+  var l=filtered();
+  var shown=l.slice(0,limit);
+  var selTxt=sel.type?('（筛选：'+(sel.type==='risk'?RISK_LABEL[sel.val]:sel.val)+'）'):'';
+  document.getElementById('listN').textContent='共 '+l.length+' 条'+selTxt;
+  document.getElementById('moreBtn').style.display=l.length>limit?'inline-flex':'none';
+  if(!l.length){document.getElementById('list').innerHTML='<div class="card empty">没有符合条件的需求</div>';return;}
+  var h='';
+  shown.forEach(function(e){
+    var od=(e.risk==='R1'||e.risk==='S2');
+    var rk=e.risk==='R1'?'t-red':(e.risk==='R2'||e.risk==='R3'?'t-amber':
+      (e.risk==='S2'?'t-red':(e.risk==='S7'?'t-amber':'t-gray')));
+    h+='<div class="req'+(od?' od':'')+'">'
+      +'<div class="req-h"><div class="req-n">'+esc(e.r.n)+'</div>'
+      +'<button class="btn-sm" onclick="openEdit(\''+esc(e.r.id)+'\')">编辑</button></div>'
+      +'<div class="req-m">'
+      +'<span class="tag t-gray">'+esc(e.stage)+'</span>'
+      +'<span class="tag '+rk+'">'+esc(RISK_LABEL[e.risk])+'</span>'
+      +'<span class="tag '+(e.r.w==='晓晓'?'t-blue':'t-gray')+'">'+esc(e.r.w||'未分配')+'</span>'
+      +'</div>'
+      +(e.cardWhy?'<div class="req-w">'+esc(e.cardWhy)+'</div>':'')
+      +redBar(e)
+      +'</div>';
+  });
+  document.getElementById('list').innerHTML=h;
+}
+/* 双时间锚点进度条：首批出货 → 进仓，并标出当前阶段的红线位置 */
+function redBar(e){
+  var r=e.r;
+  if(!r.f&&!r.h)return '<div class="rb rb-none">未关联首批出货/进仓时间，无法做进度把控</div>';
+  var h='<div class="rb">';
+  h+='<div class="rb-d">'
+    +(r.f?'<span>首批出货 <b>'+esc(r.f)+'</b>'+(r.a?' <i class="rb-ok">实际 '+esc(r.a)+'</i>':'')+'</span>':'<span class="rb-na">出货 —</span>')
+    +(r.h?'<span>进仓 <b>'+esc(r.h)+'</b>'+(e.hLeft!==null?'<i class="rb-ok">'+(e.hLeft<0?'已过 '+(-e.hLeft)+' 天':'剩 '+e.hLeft+' 天')+'</i>':'')+'</span>':'<span class="rb-na">进仓 —</span>')
+    +(!r.h&&r.l?'<span class="rb-na">上架兜底 '+esc(r.l)+'</span>':'')
+    +'</div>';
+  if(e.red!=='RS'&&e.redDate){
+    var cls=e.red==='R1'?'rb-r1':(e.red==='R2'?'rb-r2':'rb-r3');
+    var txt=e.red==='R1'?('已超 '+(-e.redLeft)+' 天'):('剩 '+e.redLeft+' 天');
+    h+='<div class="rb-red '+cls+'"><span class="rb-k">'+esc(e.redName)+'红线</span>'
+      +'<span class="rb-v">'+esc(e.redDate)+'</span><span class="rb-t">'+txt+'</span></div>';
+  }else if(e.red==='R0'&&e.redWhy){
+    h+='<div class="rb-red rb-r0"><span class="rb-t">'+esc(e.redWhy)+'</span></div>';
+  }else if(e.red==='RS'&&e.redDate){
+    h+='<div class="rb-red rb-ok"><span class="rb-k">'+esc(e.redName)+'红线</span>'
+      +'<span class="rb-v">'+esc(e.redDate)+'</span><span class="rb-t">剩 '+e.redLeft+' 天</span></div>';
+  }
+  return h+'</div>';
+}
+function renderLinks(){
+  var h='';
+  LINKS.forEach(function(x){
+    if(x.u)h+='<a class="lk" href="'+esc(x.u)+'" target="_blank" rel="noopener">'+esc(x.n)+'</a>';
+    else h+='<span class="lk lk-na">'+esc(x.n)+'（待补链接）</span>';
+  });
+  document.getElementById('links').innerHTML=h;
+}
+/* 日期平移，用于校验「寄样/返图」是否由出货时间公式推导 */
+function shiftD(ds,n){
+  if(!ds)return '';
+  var d=new Date(ds+'T00:00:00');
+  if(isNaN(d.getTime()))return '';
+  d.setDate(d.getDate()+n);
+  var p=function(x){return (x<10?'0':'')+x;};
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+}
+/* ========== 设计阶段时间账（晓晓口径 2026-11-06） ==========
+   起点 = 进仓时间（设计出图须在此前完成）；无进仓时用预计上架兜底
+   终点 = 实际结束作图 = 进度改成「已完成」那天；钉钉表不记录状态变更时间，
+          因此优先取「作图进度」日志里带日期的完成/返图记录，仍没有则算到今天（进行中）
+   天数 = 终点 − 起点：正数 = 拖过进仓节点，负数 = 距进仓还有 N 天 / 提前完成
+   口径：只统计当前视图内未完结需求，历史 57 条已完成忽略不计 */
+function parseReturnDate(log,today){
+  if(!log)return '';
+  var y=+today.slice(0,4),mo=+today.slice(5,7);
+  var re=/(\d{1,2})[.\-\/](\d{1,2})\s*[-—]?\s*/g,m,last=null,parts=[];
+  while((m=re.exec(log))){
+    if(last)parts.push({mm:last.mm,dd:last.dd,txt:log.slice(last.end,m.index)});
+    last={mm:+m[1],dd:+m[2],end:re.lastIndex};
+  }
+  if(last)parts.push({mm:last.mm,dd:last.dd,txt:log.slice(last.end)});
+  var found='';
+  parts.forEach(function(p){
+    if(p.mm<1||p.mm>12||p.dd<1||p.dd>31)return;
+    var t=p.txt||'';
+    if(!/已返图|返图完成|已出图|图已返|已返首版|已完成|作图完成|已交付|已完稿/.test(t))return;
+    if(/预计|希望|待返|明天返|预计明天/.test(t))return;   /* 「预计明天返图」不算实际完成 */
+    var yy=p.mm>mo+1?y-1:y;
+    var ds=yy+'-'+(p.mm<10?'0':'')+p.mm+'-'+(p.dd<10?'0':'')+p.dd;
+    if(!found||ds>found)found=ds;
+  });
+  return found;
+}
+
+/* ========== 卡点分析页 ========== */
+function renderInsight(){
+  var box=document.getElementById('paneInsight');
+  if(!box)return;
+  var l=allEnriched().filter(function(e){return inScope(e)&&selOK(e);});
+  var mine=(view==='mine');
+  var n=l.length;
+  if(!n){box.innerHTML='<div class="card empty">当前视角下没有需求</div>';return;}
+  var c=function(k){return l.filter(function(e){return e.red===k;}).length;};
+  var r1=c('R1'),r2=c('R2'),r3=c('R3'),r0=c('R0'),rs=c('RS');
+  var whList=l.filter(function(e){return !!e.r.h;});
+  var hasWh=whList.length;
+  var h7List=whList.filter(function(e){return e.hLeft>=0&&e.hLeft<=7;});
+  var fbLen=l.filter(function(e){return e.redFallback;}).length;
+  var pct=function(a,b){return b?Math.round(a/b*100):0;};
+
+  /* ---- 一句话结论 ---- */
+  var h='<div class="ip-h"><b>卡点分析</b><span class="muted">'+(mine?'我的':'部门')+' · '+n+' 条'
+    +' · 数据 '+esc((typeof DATA_DATE!=='undefined'?DATA_DATE:'')).slice(0,10)+'</span></div>';
+  h+='<div class="ip-lead">'
+    +'<b>'+r1+' 条已破红线</b>，'+r2+' 条 7 天内到期'
+    +(r3?'，'+r3+' 条 8–14 天内到期':'')
+    +(h7List.length?'；<b>'+h7List.length+' 条 7 天内进仓</b>。':('。'))
+    +'</div>';
+
+  /* ---- 红线分布条 ---- */
+  var seg=[['R1','红线已破','#A32D2D'],['R2','7天内','#C97A0E'],['R3','8-14天','#D9B44A'],
+    ['RS','安全','#3B6D11'],['R0','缺锚点','#B4B2A9']];
+  var bar='',lg='';
+  seg.forEach(function(s){
+    var v=c(s[0]);
+    if(v)bar+='<i style="width:'+(v/n*100)+'%;background:'+s[2]+'" title="'+s[1]+' '+v+'"></i>';
+    lg+='<span><i class="ip-dot" style="background:'+s[2]+'"></i>'+s[1]+' '+v+'</span>';
+  });
+  h+='<div class="card"><div class="ip-split">'+bar+'</div><div class="ip-lg">'+lg+'</div></div>';
+
+  /* ---- 按负责人统计 ---- */
+  var byO={};
+  l.forEach(function(e){
+    var k=e.r.w||'未分配';
+    byO[k]=byO[k]||{n:0,r1:0,r2:0,h7:0};
+    byO[k].n++;
+    if(e.red==='R1')byO[k].r1++;
+    if(e.red==='R2')byO[k].r2++;
+    if(e.hLeft!==null&&e.hLeft>=0&&e.hLeft<=7)byO[k].h7++;
+  });
+
+  /* ---- 按负责人 ---- */
+  var rows=Object.keys(byO).sort(function(a,b){return byO[b].r1-byO[a].r1||byO[b].n-byO[a].n;});
+  h+='<div class="card"><div class="ip-h"><b>按负责人</b><span class="muted">点姓名可筛选清单</span></div>'
+    +'<table class="ip-tb"><thead><tr><th>负责人</th><th class="num">在管</th><th class="num">已破线</th>'
+    +'<th class="num">7天内</th><th class="num">7天内进仓</th><th>最紧急一条</th></tr></thead><tbody>';
+  rows.forEach(function(k){
+    var o=byO[k];
+    var arr=l.filter(function(e){return (e.r.w||'未分配')===k&&e.red==='R1';})
+      .sort(function(a,b){return a.redLeft-b.redLeft;});
+    var w=arr[0];
+    h+='<tr><td class="nm">'+esc(k)+'</td>'
+      +'<td class="num">'+o.n+'</td>'
+      +'<td class="num'+(o.r1?' bad':'')+'">'+o.r1+'</td>'
+      +'<td class="num'+(o.r2?' warn':'')+'">'+o.r2+'</td>'
+      +'<td class="num'+(o.h7?' warn':'')+'">'+o.h7+'</td>'
+      +'<td class="mintxt">'+(w?esc(w.r.n)+' · 超 '+(-w.redLeft)+' 天':'—')+'</td></tr>';
+  });
+  h+='</tbody></table></div>';
+
+  /* ---- 今日必办：红线破线/临期 + 进仓临期，一个表看全 ---- */
+  var todo=l.filter(function(e){return e.red==='R1'||e.red==='R2';})
+    .sort(function(a,b){return a.redLeft-b.redLeft;});
+  var whSoon=whList.filter(function(e){return !(e.red==='R1'||e.red==='R2')&&e.hLeft>=0&&e.hLeft<=7;})
+    .sort(function(a,b){return a.hLeft-b.hLeft;});
+  var total=todo.length+whSoon.length;
+  var overlap=todo.filter(function(e){return e.hLeft!==null&&e.hLeft>=0&&e.hLeft<=7;}).length;
+  h+='<div class="card"><div class="ip-h"><b>今日必办</b><span class="muted">红线紧急 '+todo.length+' 条'
+    +(overlap?'（含 '+overlap+' 条 7 天内进仓）':'')
+    +(whSoon.length?' · 另有进仓临期 '+whSoon.length+' 条':'')+'</span></div>';
+  if(!total){
+    h+='<div class="muted" style="font-size:13px">没有紧急事项。</div>';
+  }else{
+    h+='<table class="ip-tb"><thead><tr><th>需求</th><th>事项</th><th class="num">状态</th><th></th></tr></thead><tbody>';
+    todo.forEach(function(e){
+      var over=e.redLeft<0;
+      h+='<tr><td class="nm" style="white-space:normal">'+esc(e.r.n)
+        +'<div class="mintxt">'+esc(e.stage)+' · '+esc(e.r.w||'未分配')+'</div></td>'
+        +'<td class="mintxt">'+esc(e.redName)+'红线 '+esc(e.redDate)+'</td>'
+        +'<td class="num '+(over?'bad':'warn')+'">'+(over?'超 '+(-e.redLeft)+' 天':'剩 '+e.redLeft+' 天')+'</td>'
+        +'<td><button class="btn-sm" onclick="openEdit(\''+esc(e.r.id)+'\')">处理</button></td></tr>';
+    });
+    whSoon.forEach(function(e){
+      h+='<tr><td class="nm" style="white-space:normal">'+esc(e.r.n)
+        +'<div class="mintxt">'+esc(e.stage)+' · '+esc(e.r.w||'未分配')+'</div></td>'
+        +'<td class="mintxt">进仓 '+esc(e.r.h)+'，出图须完成</td>'
+        +'<td class="num warn">'+(e.hLeft===0?'今天':'剩 '+e.hLeft+' 天')+'</td>'
+        +'<td><button class="btn-sm" onclick="openEdit(\''+esc(e.r.id)+'\')">处理</button></td></tr>';
+    });
+    h+='</tbody></table>';
+  }
+  h+='</div>';
+
+  box.innerHTML=h;
+}
+/* ========== 延误出图核算（固定范围：副本视图 29K13XF 全部需求） ==========
+   基准 = 进仓时间；实际出图 = 设计返图时间。
+   延误天数 = 实际出图 − 基准（正数为延误）；出图时间为空的不纳入计算。 */
+/* delay=按延误天数降序（默认） / wh=按进仓时间从旧到新 */
+var designSort='delay';
+function setDesignSort(v){designSort=v;refreshAll();}
+function renderDesign(){
+  var box=document.getElementById('paneDesign');
+  if(!box)return;
+  var t=todayStr();
+  var src=(typeof DESIGN_SEED!=='undefined'&&DESIGN_SEED.length?DESIGN_SEED:[]);
+  if(!src.length){box.innerHTML='<div class="card empty">副本视图数据未注入，请运行一次刷新</div>';return;}
+  var rows=src.map(function(r){
+    /* 基准 = 进仓时间；无进仓用预计上架兜底 */
+    var start=r.h||r.l||'',fb=!r.h&&!!r.l;
+    /* 实际出图 = 钉钉「设计返图时间」；没填回退作图进度日志 */
+    var finField=r.fin||'';
+    var finLog=parseReturnDate(r.log||'',t);
+    var fin=finField||finLog;
+    var finSrc=finField?'钉钉字段':(finLog?'日志解析':'');
+    var delay=null,status='',stCls='';
+    if(!fin){
+      /* 出图时间为空 → 不纳入核算，不按今天滚动计延误 */
+      status='未出图·不纳入计算';
+    }else if(start){
+      delay=diffD(start,fin);
+      if(delay>0){status='已延误';stCls='bad';}
+      else{status=delay<0?'提前出图':'按期出图';stCls='ok';}
+    }else{status='无时间锚点';}
+    /* 共享盘更新 → 进仓 的天数；任一为空则不计算（忽略空值） */
+    var shareGap=(r.sh&&start)?diffD(r.sh,start):null;
+    return {r:r,start:start,fb:fb,fin:fin,finSrc:finSrc,delay:delay,status:status,stCls:stCls,
+      sh:r.sh||'',shareGap:shareGap};
+  });
+  if(designSort==='wh'){
+    /* 进仓时间从旧到新；无锚点排最后 */
+    rows.sort(function(a,b){
+      var av=a.start||'9999-12-31',bv=b.start||'9999-12-31';
+      return av<bv?-1:(av>bv?1:0);
+    });
+  }else{
+    rows.sort(function(a,b){return (b.delay===null?-999:b.delay)-(a.delay===null?-999:a.delay);});
+  }
+  /* 只核算有出图时间的记录；空值一律排除 */
+  var calc=rows.filter(function(x){return x.delay!==null;});
+  var late=calc.filter(function(x){return x.delay>0;});
+  var avg=late.length?Math.round(late.reduce(function(s,x){return s+x.delay;},0)/late.length):0;
+  var max=late.length?Math.max.apply(null,late.map(function(x){return x.delay;})):0;
+  var noFin=rows.length-calc.length;
+  function dsSt(n,l,c){return '<div class="st '+(c||'')+'"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>';}
+  var h='<div class="ip-h"><b>延误出图时间核算</b><span class="muted">数据源：新品&amp;新增变体时间节点视图 (副本)'
+    +' · 全部 '+src.length+' 条 · 判定日 '+t+'</span></div>';
+  h+='<div class="dsv-sum">'
+    +dsSt(calc.length,'纳入核算','')
+    +dsSt(late.length,'延误条数','red')
+    +dsSt(avg+' 天','平均延误','red')
+    +dsSt(max+' 天','最长延误','red')
+    +'</div>';
+  h+='<div class="dsv-note">口径：<b>延误出图时间 = 设计返图时间 − 进仓时间</b>（无进仓用预计上架兜底），'
+    +'正数即延误天数，负数/0 为提前或按期出图。'
+    +'<b>出图时间为空的 '+noFin+' 条不纳入计算</b>（不按今天滚动估算、不进平均值），仅在下方明细里列出供查看。'
+    +'本次纳入 '+calc.length+' 条：延误 '+late.length+' 条、提前/按期 '+(calc.length-late.length)+' 条。'
+    +'出图日优先读钉钉「<b>设计返图时间</b>」字段（由内容需求对接群最早返图消息回填），没填才回退作图进度日志。'
+    +'新增列「共享盘更新→进仓」= 进仓时间 − 共享盘路径更新时间，<b>任一为空即留空不计算</b>。'
+    +'本页覆盖副本视图全部需求，主工作台的需求清单 / 卡点分析不受影响。</div>';
+  h+='<div class="card"><div class="ip-h"><b>逐条延误核算</b>'
+    +'<span class="muted">数据 '+esc((typeof DATA_DATE!=='undefined'?DATA_DATE:'').slice(0,10))+'</span>'
+    +'<span style="flex:1"></span>'
+    +'<button class="dsv-sort'+(designSort==='delay'?' on':'')+'" onclick="setDesignSort(\'delay\')">延误天数降序</button>'
+    +'<button class="dsv-sort'+(designSort==='wh'?' on':'')+'" onclick="setDesignSort(\'wh\')">进仓时间 旧→新</button>'
+    +'</div>'
+    +'<table class="ip-tb"><thead><tr><th>需求</th>'
+    +'<th>进仓（基准）</th><th>实际出图</th><th class="num">延误天数</th><th class="num">共享盘更新→进仓</th>'
+    +'</tr></thead><tbody>';
+  rows.forEach(function(x){
+    var r=x.r;
+    var dtxt=x.delay===null?'—':(x.delay>0?'+'+x.delay+' 天':(x.delay<0?'提前 '+(-x.delay)+' 天':'0 天'));
+    var shtxt=x.shareGap===null?'—':x.shareGap+' 天';
+    h+='<tr><td class="nm" style="white-space:normal">'+esc(r.n)+'</td>'
+      +'<td class="mintxt" style="white-space:nowrap">'+(x.start?esc(x.start)+(x.fb?'<div style="font-size:11px;opacity:.72">上架兜底</div>':''):'<span class="rb-na">未填</span>')+'</td>'
+      +'<td class="mintxt" style="white-space:nowrap">'+(x.fin?esc(x.fin):'<span class="rb-na">未出图</span>')+'</td>'
+      +'<td class="num '+(x.delay>0?'bad':'')+'">'+dtxt
+        +(x.delay>0?'<div class="dsv-bar"><i class="hot" style="width:'
+          +Math.min(100,Math.round(x.delay/Math.max(max,1)*100))+'%"></i></div>':'')
+      +'</td>'
+      +'<td class="num">'+shtxt
+        +(x.sh?'<div style="font-size:11px;color:var(--gray);font-weight:400">'+esc(x.sh)+'</div>':'')
+      +'</td></tr>';
+  });
+  h+='</tbody></table></div>';
+  box.innerHTML=h;
+}
+function setPane(p){
+  pane=p;
+  document.getElementById('paneList').style.display=(p==='list'?'':'none');
+  document.getElementById('paneInsight').style.display=(p==='insight'?'':'none');
+  document.getElementById('paneDesign').style.display=(p==='design'?'':'none');
+  document.getElementById('psw-list').className='psw'+(p==='list'?' on':'');
+  document.getElementById('psw-insight').className='psw'+(p==='insight'?' on':'');
+  document.getElementById('psw-design').className='psw'+(p==='design'?' on':'');
+  if(p==='insight')renderInsight();
+  if(p==='design')renderDesign();
+}
+function refreshAll(){
+  renderHeader();
+  renderSidebar();
+  renderStats();
+  renderToday();
+  renderList();
+  renderLinks();
+  if(pane==='insight')renderInsight();
+  if(pane==='design')renderDesign();
+}
+
+/* ========== 事件 ========== */
+function setView(v){view=v;limit=40;refreshAll();}
+function setStatus(s){
+  statusFilter=s;
+  ['all','anchor'].forEach(function(k){
+    document.getElementById('sf-'+k).className='chip'+(statusFilter===k?' on':'');
+  });
+  limit=40;refreshAll();
+}
+function setSel(type,val){
+  if(sel.type===type&&sel.val===val){sel={type:null,val:null};}
+  else sel={type:type,val:val};
+  limit=40;refreshAll();
+}
+function clearSel(){sel={type:null,val:null};limit=40;refreshAll();}
+function moreList(){limit+=60;renderList();}
+
+function openNew(){
+  editId=null;
+  document.getElementById('eTitle').textContent='新增需求';
+  document.getElementById('eName').value='';
+  fillProg('');
+  fillOwner('晓晓');
+  document.getElementById('eExp').value='';
+  document.getElementById('eLau').value='';
+  document.getElementById('eSub').value=todayStr();
+  document.getElementById('eCat').value='';
+  document.getElementById('eNote').value='';
+  document.getElementById('eFsh').value='';
+  document.getElementById('eWh').value='';
+  document.getElementById('eAsh').value='';
+  document.getElementById('maskE').className='mask on';
+}
+function openEdit(id){
+  var r=null;
+  for(var i=0;i<DATA.length;i++){if(DATA[i].id===id){r=DATA[i];break;}}
+  if(!r){toast('未找到该需求');return;}
+  editId=id;
+  document.getElementById('eTitle').textContent='编辑需求';
+  document.getElementById('eName').value=r.n||'';
+  fillProg(r.p||'');
+  fillOwner(r.w||'');
+  document.getElementById('eExp').value=r.e||'';
+  document.getElementById('eLau').value=r.l||'';
+  document.getElementById('eSub').value=r.u||'';
+  document.getElementById('eCat').value=r.c||'';
+  document.getElementById('eNote').value=r.note||'';
+  document.getElementById('eFsh').value=r.f||'';
+  document.getElementById('eWh').value=r.h||'';
+  document.getElementById('eAsh').value=r.a||'';
+  document.getElementById('maskE').className='mask on';
+}
+function fillProg(cur){
+  var h='<option value="">（未填）</option>';
+  PROGRESS.forEach(function(p){h+='<option'+(p===cur?' selected':'')+'>'+p+'</option>';});
+  document.getElementById('eProg').innerHTML=h;
+}
+function fillOwner(cur){
+  var h='';
+  MEMBERS.forEach(function(m){h+='<option'+(m===cur?' selected':'')+'>'+m+'</option>';});
+  h+='<option'+((!cur||MEMBERS.indexOf(cur)<0)?' selected':'')+'>未分配</option>';
+  document.getElementById('eOwner').innerHTML=h;
+}
+function closeE(){document.getElementById('maskE').className='mask';editId=null;}
+function saveEdit(){
+  var name=document.getElementById('eName').value.trim();
+  if(!name){toast('请填需求名称');return;}
+  var p=document.getElementById('eProg').value;
+  var w=document.getElementById('eOwner').value;
+  var o={
+    n:name,p:p,s:STAGE_OF[p]||'内容阶段',
+    e:document.getElementById('eExp').value,
+    l:document.getElementById('eLau').value,
+    u:document.getElementById('eSub').value,
+    f:document.getElementById('eFsh').value,
+    h:document.getElementById('eWh').value,
+    a:document.getElementById('eAsh').value,
+    c:document.getElementById('eCat').value.trim(),
+    w:(w==='未分配'?'':w),
+    o:w==='晓晓'?1:0,
+    m:1,mt:nowStamp(),
+    note:document.getElementById('eNote').value.trim()
+  };
+  if(editId){
+    for(var i=0;i<DATA.length;i++){
+      if(DATA[i].id===editId){
+        o.id=editId;
+        /* 保留钉钉侧字段，编辑不覆盖 */
+        o.pr=DATA[i].pr||'';o.sd=DATA[i].sd||'';o.bk=DATA[i].bk||'';o.c=DATA[i].c||'';o.q=DATA[i].q||'';
+        o.rt=DATA[i].rt||'';o.ps=DATA[i].ps||'';o.log=DATA[i].log||'';   /* 设计停留视图用的钉钉字段 */
+        DATA[i]=o;break;
+      }
+    }
+  }else{
+    o.id='r'+Date.now();DATA.unshift(o);
+  }
+  saveData();closeE();refreshAll();toast('已保存');
+}
+function delReq(){
+  if(!editId){closeE();return;}
+  if(!confirm('确定删除这条需求？'))return;
+  DATA=DATA.filter(function(x){return x.id!==editId;});
+  saveData();closeE();refreshAll();toast('已删除');
+}
+
+function exportJSON(){
+  var blob=new Blob([JSON.stringify(DATA,null,1)],{type:'application/json'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='内容需求备份-'+todayStr()+'.json';
+  a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href);},800);
+  toast('已导出 '+DATA.length+' 条');
+}
+document.getElementById('impFile').addEventListener('change',function(ev){
+  var f=ev.target.files&&ev.target.files[0];if(!f)return;
+  var rd=new FileReader();
+  rd.onload=function(){
+    try{
+      var a=JSON.parse(rd.result);
+      if(!Array.isArray(a))throw new Error('格式不对');
+      if(!confirm('导入 '+a.length+' 条数据，将覆盖当前列表。继续？'))return;
+      DATA=a.map(function(x,i){
+        return {id:x.id||('i'+i+Date.now()),n:x.n||'',p:x.p||'',s:x.s||STAGE_OF[x.p]||'内容阶段',
+          e:x.e||'',l:x.l||'',u:x.u||'',f:x.f||'',h:x.h||'',a:x.a||'',c:x.c||'',w:x.w||'',o:(x.w==='晓晓'||(x.o&&!x.w))?1:0,
+          pr:x.pr||'',sd:x.sd||'',bk:x.bk||'',q:x.q||'',rt:x.rt||'',ps:x.ps||'',log:x.log||'',m:1,note:x.note||''};
+      });
+      saveData();refreshAll();toast('已导入 '+DATA.length+' 条');
+    }catch(e){toast('导入失败：'+e.message);}
+    ev.target.value='';
+  };
+  rd.readAsText(f);
+});
+
+var toastT=null;
+function toast(m){
+  var el=document.getElementById('toast');
+  el.textContent=m;el.style.display='block';
+  clearTimeout(toastT);
+  toastT=setTimeout(function(){el.style.display='none';},2200);
+}
+
+/* ========== 一键刷新 ========== */
+/* 本地 HTML 无法直连钉钉；重载会读取磁盘上由刷新脚本注入的最新 SEED，
+   并用当天日期重算全部红线 / 统计 / 今日必办。
+   视角、页签、筛选临时存 sessionStorage，重载后还原，不打断当前工作流。 */
+function doRefresh(){
+  var btn=document.getElementById('btnRefresh');
+  if(btn){btn.disabled=true;btn.className='btn-sm busy';}
+  var st={view:view,pane:pane,status:statusFilter,sel:sel,designSort:designSort,fromRefresh:true};
+  try{sessionStorage.setItem('wb_amzreq_ui',JSON.stringify(st));}catch(e){}
+  toast('正在读取最新数据快照…');
+  setTimeout(function(){location.reload();},350);
+}
+function restoreUI(){
+  var u=null;
+  try{u=JSON.parse(sessionStorage.getItem('wb_amzreq_ui')||'null');}catch(e){}
+  if(!u)return false;
+  try{sessionStorage.removeItem('wb_amzreq_ui');}catch(e){}
+  if(u.view==='mine'||u.view==='dept')view=u.view;
+  if(u.pane==='list'||u.pane==='insight'||u.pane==='design')pane=u.pane;
+  if(u.status==='all'||u.status==='anchor')statusFilter=u.status;
+  if(u.sel&&u.sel.type)sel={type:u.sel.type,val:u.sel.val};
+  if(u.designSort==='delay'||u.designSort==='wh')designSort=u.designSort;
+  syncUIButtons();
+  return !!u.fromRefresh;
+}
+function syncUIButtons(){
+  ['all','anchor'].forEach(function(k){
+    var b=document.getElementById('sf-'+k);if(b)b.className='chip'+(statusFilter===k?' on':'');
+  });
+  ['list','insight','design'].forEach(function(k){
+    var b=document.getElementById('psw-'+k);if(b)b.className='psw'+(pane===k?' on':'');
+  });
+  ['list','insight','design'].forEach(function(k){
+    var el=document.getElementById('pane'+k.charAt(0).toUpperCase()+k.slice(1));
+    if(el)el.style.display=(pane===k?'':'none');
+  });
+}
+
+/* ========== 初始化 ========== */
+document.addEventListener('DOMContentLoaded',function(){
+  var wasRefresh=restoreUI();
+  loadData();
+  var needId=false;
+  DATA.forEach(function(r){if(!r.id){r.id='r'+Math.random().toString(36).slice(2,9);needId=true;}});
+  if(needId)saveData();
+  refreshAll();
+  if(pendingToast){var t=pendingToast;pendingToast='';setTimeout(function(){toast(t);},700);}
+  else if(wasRefresh){
+    var ds=(typeof DATA_DATE!=='undefined'?DATA_DATE:'');
+    setTimeout(function(){toast('已刷新 · 当前数据快照 '+ds);},300);
+  }
+});
+</script>
+</body>
+</html>
