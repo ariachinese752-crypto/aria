@@ -95,7 +95,7 @@ header{background:#fff;border-bottom:0.5px solid var(--line);padding:12px 16px;p
 @media(max-width:900px){.side{position:static}}
 
 /* scope tabs */
-.vtabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}
+.vtabs{display:grid;grid-template-columns:1fr;gap:6px;margin-bottom:12px}
 .vtab{padding:10px 6px;font-size:13px;min-height:44px;border-radius:8px;border:0.5px solid var(--gray-b);
   background:#fff;cursor:pointer;text-align:center;line-height:1.3}
 .vtab b{display:block;font-size:16px;font-weight:600}
@@ -275,9 +275,9 @@ header{background:#fff;border-bottom:0.5px solid var(--line);padding:12px 16px;p
 
     <!-- 左侧栏 -->
     <aside class="side">
+      <!-- 视角固定为「部门总览」，已移除「我的需求」双视角切换 -->
       <div class="vtabs">
-        <div class="vtab on" id="vt-mine" onclick="setView('mine')"><b id="cnMine">0</b><span>我的需求</span></div>
-        <div class="vtab" id="vt-dept" onclick="setView('dept')"><b id="cnDept">0</b><span>部门总览</span></div>
+        <div class="vtab on" style="cursor:default"><b id="cnDept">0</b><span>部门总览 · 全部需求</span></div>
       </div>
 
       <div class="fg">
@@ -444,7 +444,8 @@ var DEFAULT_LINKS=[
 
 /* ========== 状态 ========== */
 var DATA=[],LINKS=[];
-var view='mine', statusFilter='all', sel={type:null,val:null}, pane='list';
+/* 视角固定「部门总览」，不再提供「我的需求」切换 */
+var view='dept', statusFilter='all', sel={type:null,val:null}, pane='list';
 var editId=null, limit=40;
 var pendingToast='';
 
@@ -619,10 +620,7 @@ function renderHeader(){
   var d=new Date();
   document.getElementById('hdDate').textContent=(d.getMonth()+1)+'月'+d.getDate()+'日';
   var a=allEnriched();
-  document.getElementById('cnMine').textContent=a.filter(function(e){return e.r.o===1;}).length;
   document.getElementById('cnDept').textContent=a.length;
-  document.getElementById('vt-mine').className='vtab'+(view==='mine'?' on':'');
-  document.getElementById('vt-dept').className='vtab'+(view==='dept'?' on':'');
   renderSyncMark();
 }
 /* 数据新鲜度：告诉用户当前看的是哪天的钉钉快照 */
@@ -649,9 +647,7 @@ function syncTip(){
 }
 function renderSidebar(){
   var list=scopeAll();
-  /* 「我的需求」视角下按负责人筛选没有意义，隐藏该组 */
-  var owBox=document.getElementById('fgOwner').parentNode;
-  if(owBox)owBox.style.display=(view==='mine'?'none':'');
+  /* 部门总览视角：按负责人筛选始终显示 */
   function countGroup(keyArr,getVal){
     var m={};keyArr.forEach(function(k){m[k]=0;});
     list.forEach(function(e){var v=getVal(e);if(m[v]!==undefined)m[v]++;});
@@ -696,18 +692,17 @@ function renderSidebar(){
   })();
   draw('fgStage',STAGE_ORDER.map(function(s){return [s,s];}),function(e){return e.stage;},'stage');
   draw('fgOwner',['晓晓','诗雨','楠楠','文姐','未分配'].map(function(s){
-    return [s,(view==='dept'&&s==='晓晓')?'晓晓（我）':s];}),function(e){return e.r.w||'未分配';},'owner');
+    return [s,s==='晓晓'?'晓晓（我）':s];}),function(e){return e.r.w||'未分配';},'owner');
 }
 function renderStats(){
   var l=scopeAll();
-  var mine=view==='mine';
   var r1=l.filter(function(e){return e.red==='R1';}).length;
   var r2=l.filter(function(e){return e.red==='R2';}).length;
   var r0=l.filter(function(e){return e.red==='R0';}).length;
   var h7=l.filter(function(e){return e.hLeft!==null&&e.hLeft>=0&&e.hLeft<=7;}).length;
   var h='';
   function st(n,la,cls){return '<div class="st '+(cls||'')+'"><div class="n">'+n+'</div><div class="l">'+la+'</div></div>';}
-  h+=st(l.length,mine?'我的新品需求':'部门新品/变体需求','');
+  h+=st(l.length,'部门新品/变体需求','');
   h+=st(r1,'红线已破','red');
   h+=st(r2,'7天内到期','amber');
   h+=st(h7,'7天内进仓','amber');
@@ -850,7 +845,6 @@ function renderInsight(){
   var box=document.getElementById('paneInsight');
   if(!box)return;
   var l=allEnriched().filter(function(e){return inScope(e)&&selOK(e);});
-  var mine=(view==='mine');
   var n=l.length;
   if(!n){box.innerHTML='<div class="card empty">当前视角下没有需求</div>';return;}
   var c=function(k){return l.filter(function(e){return e.red===k;}).length;};
@@ -862,7 +856,7 @@ function renderInsight(){
   var pct=function(a,b){return b?Math.round(a/b*100):0;};
 
   /* ---- 一句话结论 ---- */
-  var h='<div class="ip-h"><b>卡点分析</b><span class="muted">'+(mine?'我的':'部门')+' · '+n+' 条'
+  var h='<div class="ip-h"><b>卡点分析</b><span class="muted">部门 · '+n+' 条'
     +' · 数据 '+esc((typeof DATA_DATE!=='undefined'?DATA_DATE:'')).slice(0,10)+'</span></div>';
   h+='<div class="ip-lead">'
     +'<b>'+r1+' 条已破红线</b>，'+r2+' 条 7 天内到期'
@@ -1061,7 +1055,8 @@ function refreshAll(){
 }
 
 /* ========== 事件 ========== */
-function setView(v){view=v;limit=40;refreshAll();}
+/* 兼容旧版会话状态：视角已固定部门，参数不再生效（页面无切换入口） */
+function setView(){view='dept';limit=40;refreshAll();}
 function setStatus(s){
   statusFilter=s;
   ['all','anchor'].forEach(function(k){
@@ -1219,7 +1214,7 @@ function restoreUI(){
   try{u=JSON.parse(sessionStorage.getItem('wb_amzreq_ui')||'null');}catch(e){}
   if(!u)return false;
   try{sessionStorage.removeItem('wb_amzreq_ui');}catch(e){}
-  if(u.view==='mine'||u.view==='dept')view=u.view;
+  view='dept'; /* 历史会话里可能存过 'mine'，一律固定为部门总览 */
   if(u.pane==='list'||u.pane==='insight'||u.pane==='design')pane=u.pane;
   if(u.status==='all'||u.status==='anchor')statusFilter=u.status;
   if(u.sel&&u.sel.type)sel={type:u.sel.type,val:u.sel.val};
