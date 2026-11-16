@@ -312,6 +312,7 @@ header{background:#fff;border-bottom:0.5px solid var(--line);padding:12px 16px;p
         <button class="psw on" id="psw-list" onclick="setPane('list')">需求清单</button>
         <button class="psw" id="psw-insight" onclick="setPane('insight')">卡点分析</button>
         <button class="psw" id="psw-design" onclick="setPane('design')">延误出图</button>
+        <button class="psw" id="psw-shoot" onclick="setPane('shoot')">拍摄卡点</button>
       </div>
 
       <div id="paneList">
@@ -329,6 +330,7 @@ header{background:#fff;border-bottom:0.5px solid var(--line);padding:12px 16px;p
 
       <div id="paneInsight" style="display:none"></div>
       <div id="paneDesign" style="display:none"></div>
+      <div id="paneShoot" style="display:none"></div>
 
       <div class="card" style="margin-top:16px">
         <div style="font-size:14px;font-weight:500;margin-bottom:10px">常用入口</div>
@@ -1032,16 +1034,96 @@ function renderDesign(){
   h+='</tbody></table></div>';
   box.innerHTML=h;
 }
+/* ===== 拍摄返图卡点视图 =====
+   数据源：主视图 eG9FNYm（与「延误出图」页的副本视图 29K13XF 相互独立）。
+   口径：「卡在拍摄没返图」= 需求当前仍处【拍摄阶段】（拍摄返图未闭环，进不了设计作图）。
+   基准 = 钉钉「拍摄返图时间」(DDvcSyi)：公式字段＝首批出货 + 5 天的【计划返图节点】，
+          不是实际返图发生日（钉钉表暂无「实际拍摄返图日」字段）。
+   超期天数 = 判定日 − 计划返图节点；正数＝已超节点仍没返图，负数＝距节点还有几天。
+   拍摄返图时间为空的记录不纳入超期统计（忽略空值），仅在明细里列出。 */
+var shootSort='overdue';
+function setShootSort(v){shootSort=v;refreshAll();}
+function renderShoot(){
+  var box=document.getElementById('paneShoot');
+  if(!box)return;
+  var t=todayStr();
+  var rows=allEnriched().filter(function(e){return e.stage==='拍摄阶段';}).map(function(e){
+    var r=e.r;
+    var base=r.bk||'';                       /* 拍摄返图时间（计划节点） */
+    var over=base?diffD(base,t):null;        /* 今天 − 基准；正=已超，负=距节点还有 */
+    var waited=r.sd?diffD(r.sd,t):null;      /* 样品寄出至今已等待天数 */
+    var b=BLOCK_OF[r.p]||{at:r.p||'—'};
+    return {r:r,at:b.at,prog:r.p||'—',owner:r.w||'未分配',
+      base:base,over:over,waited:waited,sd:r.sd||'',f:r.f||''};
+  });
+  if(shootSort==='base'){
+    /* 计划返图节点从旧到新；无基准排最后 */
+    rows.sort(function(a,b){
+      var av=a.base||'9999-12-31',bv=b.base||'9999-12-31';
+      return av<bv?-1:(av>bv?1:0);
+    });
+  }else{
+    /* 超期天数降序 */
+    rows.sort(function(a,b){return (b.over===null?-999:b.over)-(a.over===null?-999:a.over);});
+  }
+  var calc=rows.filter(function(x){return x.over!==null;});
+  var late=calc.filter(function(x){return x.over>0;});
+  var avg=late.length?Math.round(late.reduce(function(s,x){return s+x.over;},0)/late.length):0;
+  var max=late.length?Math.max.apply(null,late.map(function(x){return x.over;})):0;
+  var noBase=rows.length-calc.length;
+  function ss(n,l,c){return '<div class="st '+(c||'')+'"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>';}
+  var h='<div class="ip-h"><b>拍摄返图卡点 · 未返图节点核算</b><span class="muted">数据源：新品&amp;新增变体时间节点视图（主）'
+    +' · 卡点 '+rows.length+' 条 · 判定日 '+t+'</span></div>';
+  h+='<div class="dsv-sum">'
+    +ss(rows.length,'拍摄未返图需求','')
+    +ss(late.length,'已超返图节点','red')
+    +ss(avg+' 天','平均超期','red')
+    +ss(max+' 天','最长超期','red')
+    +'</div>';
+  h+='<div class="dsv-note">口径：<b>「卡在拍摄没返图」＝需求仍处拍摄阶段</b>（拍摄返图未闭环，尚未进入设计作图）。'
+    +'以钉钉「<b>拍摄返图时间</b>」为基准，<b>超期天数 ＝ 判定日 − 拍摄返图时间</b>：正数＝已超计划返图节点却仍没返图，负数＝距节点还有几天。'
+    +'<b>拍摄返图时间为空的 '+noBase+' 条不纳入超期统计</b>，仅在明细列出。'
+    +'⚠️ 注意：「拍摄返图时间」是钉钉<b>公式字段＝首批出货 + 5 天的计划返图节点</b>，<b>并非实际返图发生日</b>；'
+    +'钉钉表暂无「实际拍摄返图日」字段，因此本页衡量的是「相对计划节点的卡点时长 / 紧迫度」，不是实际返图延误核算。'
+    +'本页取自主视图，与「延误出图」页的副本视图相互独立，互不影响。</div>';
+  h+='<div class="card"><div class="ip-h"><b>逐条卡点核算</b>'
+    +'<span class="muted">数据 '+esc((typeof DATA_DATE!=='undefined'?DATA_DATE:'').slice(0,10))+'</span>'
+    +'<span style="flex:1"></span>'
+    +'<button class="dsv-sort'+(shootSort==='overdue'?' on':'')+'" onclick="setShootSort(\'overdue\')">超期天数降序</button>'
+    +'<button class="dsv-sort'+(shootSort==='base'?' on':'')+'" onclick="setShootSort(\'base\')">返图节点 旧→新</button>'
+    +'</div>'
+    +'<table class="ip-tb"><thead><tr><th>需求</th><th>当前卡点</th><th>拍摄寄样</th>'
+    +'<th>拍摄返图（基准）</th><th class="num">超期天数</th><th class="num">寄样后已等待</th>'
+    +'</tr></thead><tbody>';
+  rows.forEach(function(x){
+    var otxt=x.over===null?'—':(x.over>0?'+'+x.over+' 天':(x.over<0?'距节点 '+(-x.over)+' 天':'今天到节点'));
+    var wtxt=x.waited===null?'—':x.waited+' 天';
+    h+='<tr><td class="nm" style="white-space:normal">'+esc(x.r.n)
+      +'<div style="font-size:11px;color:var(--gray);font-weight:400">'+esc(x.owner)+'</div></td>'
+      +'<td class="mintxt" style="white-space:nowrap">'+esc(x.at)
+        +'<div style="font-size:11px;opacity:.72">'+esc(x.prog)+'</div></td>'
+      +'<td class="mintxt" style="white-space:nowrap">'+(x.sd?esc(x.sd):'<span class="rb-na">未填</span>')+'</td>'
+      +'<td class="mintxt" style="white-space:nowrap">'+(x.base?esc(x.base):'<span class="rb-na">未填</span>')+'</td>'
+      +'<td class="num '+(x.over>0?'bad':'')+'">'+otxt
+        +(x.over>0?'<div class="dsv-bar"><i class="hot" style="width:'
+          +Math.min(100,Math.round(x.over/Math.max(max,1)*100))+'%"></i></div>':'')
+      +'</td>'
+      +'<td class="num">'+wtxt+'</td></tr>';
+  });
+  h+='</tbody></table></div>';
+  if(!rows.length)h+='<div class="card empty">当前没有卡在拍摄阶段的需求，拍摄返图节点已全部闭环 ✅</div>';
+  box.innerHTML=h;
+}
 function setPane(p){
   pane=p;
-  document.getElementById('paneList').style.display=(p==='list'?'':'none');
-  document.getElementById('paneInsight').style.display=(p==='insight'?'':'none');
-  document.getElementById('paneDesign').style.display=(p==='design'?'':'none');
-  document.getElementById('psw-list').className='psw'+(p==='list'?' on':'');
-  document.getElementById('psw-insight').className='psw'+(p==='insight'?' on':'');
-  document.getElementById('psw-design').className='psw'+(p==='design'?' on':'');
+  ['list','insight','design','shoot'].forEach(function(k){
+    var el=document.getElementById('pane'+k.charAt(0).toUpperCase()+k.slice(1));
+    if(el)el.style.display=(p===k?'':'none');
+    var b=document.getElementById('psw-'+k);if(b)b.className='psw'+(p===k?' on':'');
+  });
   if(p==='insight')renderInsight();
   if(p==='design')renderDesign();
+  if(p==='shoot')renderShoot();
 }
 function refreshAll(){
   renderHeader();
@@ -1052,6 +1134,7 @@ function refreshAll(){
   renderLinks();
   if(pane==='insight')renderInsight();
   if(pane==='design')renderDesign();
+  if(pane==='shoot')renderShoot();
 }
 
 /* ========== 事件 ========== */
@@ -1204,7 +1287,7 @@ function toast(m){
 function doRefresh(){
   var btn=document.getElementById('btnRefresh');
   if(btn){btn.disabled=true;btn.className='btn-sm busy';}
-  var st={view:view,pane:pane,status:statusFilter,sel:sel,designSort:designSort,fromRefresh:true};
+  var st={view:view,pane:pane,status:statusFilter,sel:sel,designSort:designSort,shootSort:shootSort,fromRefresh:true};
   try{sessionStorage.setItem('wb_amzreq_ui',JSON.stringify(st));}catch(e){}
   toast('正在读取最新数据快照…');
   setTimeout(function(){location.reload();},350);
@@ -1215,10 +1298,11 @@ function restoreUI(){
   if(!u)return false;
   try{sessionStorage.removeItem('wb_amzreq_ui');}catch(e){}
   view='dept'; /* 历史会话里可能存过 'mine'，一律固定为部门总览 */
-  if(u.pane==='list'||u.pane==='insight'||u.pane==='design')pane=u.pane;
+  if(u.pane==='list'||u.pane==='insight'||u.pane==='design'||u.pane==='shoot')pane=u.pane;
   if(u.status==='all'||u.status==='anchor')statusFilter=u.status;
   if(u.sel&&u.sel.type)sel={type:u.sel.type,val:u.sel.val};
   if(u.designSort==='delay'||u.designSort==='wh')designSort=u.designSort;
+  if(u.shootSort==='overdue'||u.shootSort==='base')shootSort=u.shootSort;
   syncUIButtons();
   return !!u.fromRefresh;
 }
@@ -1226,10 +1310,10 @@ function syncUIButtons(){
   ['all','anchor'].forEach(function(k){
     var b=document.getElementById('sf-'+k);if(b)b.className='chip'+(statusFilter===k?' on':'');
   });
-  ['list','insight','design'].forEach(function(k){
+  ['list','insight','design','shoot'].forEach(function(k){
     var b=document.getElementById('psw-'+k);if(b)b.className='psw'+(pane===k?' on':'');
   });
-  ['list','insight','design'].forEach(function(k){
+  ['list','insight','design','shoot'].forEach(function(k){
     var el=document.getElementById('pane'+k.charAt(0).toUpperCase()+k.slice(1));
     if(el)el.style.display=(pane===k?'':'none');
   });
