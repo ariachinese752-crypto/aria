@@ -246,6 +246,30 @@ header{background:#fff;border-bottom:0.5px solid var(--line);padding:12px 16px;p
 .dsv-sort{font-size:11.5px;min-height:28px;padding:3px 9px;border-radius:6px;
   border:0.5px solid var(--line);background:#fff;color:var(--gray);cursor:pointer}
 .dsv-sort.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+/* ===== 全部需求看板：按阶段分列，标注卡点进度 ===== */
+.kb-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:start}
+@media(max-width:900px){.kb-grid{grid-template-columns:1fr}}
+.kb-col{background:#fff;border:0.5px solid var(--line);border-radius:12px;padding:12px;min-height:140px}
+.kb-col-h{display:flex;align-items:center;gap:7px;padding-bottom:9px;border-bottom:0.5px solid var(--line);margin-bottom:10px;flex-wrap:wrap}
+.kb-col-h b{font-size:14px;font-weight:600}
+.kb-col-n{font-size:12px;color:var(--gray);margin-left:auto}
+.kb-card{background:#fff;border:0.5px solid var(--line);border-radius:9px;padding:10px 11px;margin-bottom:9px}
+.kb-card:last-child{margin-bottom:0}
+.kb-card.od{border-color:var(--red-b)}
+.kb-n{font-size:13px;font-weight:500;line-height:1.4;word-break:break-word}
+.kb-m{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;align-items:center}
+.kb-p{font-size:12px;color:var(--gray);margin-top:6px;line-height:1.5}
+.kb-p b{color:#2C2C2A;font-weight:500}
+.kb-why{font-size:11.5px;color:var(--red);margin-top:5px;line-height:1.5}
+.kb-d{display:flex;gap:9px;flex-wrap:wrap;font-size:11.5px;color:var(--gray);margin-top:7px;padding-top:7px;border-top:0.5px dashed var(--line)}
+.kb-d b{font-weight:500;color:#2C2C2A;font-variant-numeric:tabular-nums}
+.kb-track{display:flex;gap:3px;margin-top:8px}
+.kb-track i{flex:1;height:4px;border-radius:2px;background:var(--line)}
+.kb-track i.done{background:#C8DCC8}
+.kb-track i.cur{background:var(--blue)}
+.kb-track i.cur.bad{background:var(--red)}
+.kb-track-l{display:flex;gap:3px;margin-top:3px;font-size:10px;color:var(--gray-b)}
+.kb-track-l span{flex:1;text-align:center}
 </style>
 </head>
 <body>
@@ -314,6 +338,7 @@ header{background:#fff;border-bottom:0.5px solid var(--line);padding:12px 16px;p
         <button class="psw" id="psw-insight" onclick="setPane('insight')">卡点分析</button>
         <button class="psw" id="psw-shoot" onclick="setPane('shoot')">拍摄卡点</button>
         <button class="psw" id="psw-design" onclick="setPane('design')">设计卡点</button>
+        <button class="psw" id="psw-board" onclick="setPane('board')">全部需求看板</button>
       </div>
 
       <div id="paneList">
@@ -332,6 +357,7 @@ header{background:#fff;border-bottom:0.5px solid var(--line);padding:12px 16px;p
       <div id="paneInsight" style="display:none"></div>
       <div id="paneDesign" style="display:none"></div>
       <div id="paneShoot" style="display:none"></div>
+      <div id="paneBoard" style="display:none"></div>
 
       <div class="card" style="margin-top:16px">
         <div style="font-size:14px;font-weight:500;margin-bottom:10px">常用入口</div>
@@ -1119,9 +1145,83 @@ function renderShoot(){
   if(!rows.length)h+='<div class="card empty">当前没有卡在拍摄阶段的需求，拍摄返图节点已全部闭环 ✅</div>';
   box.innerHTML=h;
 }
+/* ========== 全部需求看板（按阶段分列，标注卡点进度） ==========
+   数据源：主视图 eG9FNYm（与需求清单同一份 SEED）。
+   三列 = 内容／拍摄／设计阶段；每条需求按「当前所处阶段」归档，
+   卡片标注：当前卡点、停留天数、风险等级、负责人、红线状态与三阶段进度。 */
+function renderBoard(){
+  var box=document.getElementById('paneBoard');
+  if(!box)return;
+  var t=todayStr();
+  var l=allEnriched().filter(function(e){return inScope(e)&&selOK(e);});
+  var stages=STAGE_ORDER.slice();
+  var groups={};
+  stages.forEach(function(s){groups[s]=[];});
+  l.forEach(function(e){if(groups[e.stage])groups[e.stage].push(e);});
+  var sev={'R1':0,'S2':1,'R2':2,'R3':3,'R0':4,'S4':5,'S5':6,'S7':7,'S9':8,'S10':9,'S8':10,'OK':11};
+  stages.forEach(function(s){
+    groups[s].sort(function(a,b){
+      var av=sev[a.risk]===undefined?99:sev[a.risk], bv=sev[b.risk]===undefined?99:sev[b.risk];
+      return av-bv||((a.redLeft===null?9999:a.redLeft)-(b.redLeft===null?9999:b.redLeft));
+    });
+  });
+  function card(e){
+    var r=e.r, idx=stages.indexOf(e.stage);
+    var bad=(e.risk==='R1'||e.risk==='S2');
+    var rk=bad?'t-red':(e.risk==='R2'||e.risk==='R3'||e.risk==='S7'?'t-amber':'t-gray');
+    var b=BLOCK_OF[r.p]||{at:r.p||'—',w:''};
+    var h='<div class="kb-card'+(bad?' od':'')+'">'
+      +'<div class="kb-n">'+esc(r.n)+'</div>'
+      +'<div class="kb-m"><span class="tag '+rk+'">'+esc(RISK_LABEL[e.risk]||e.risk)+'</span>'
+        +'<span class="tag '+(r.w==='晓晓'?'t-blue':'t-gray')+'">'+esc(r.w||'未分配')+'</span>'
+        +'<span class="tag t-gray">'+esc(r.p||'—')+'</span></div>'
+      +'<div class="kb-p"><b>当前卡点：</b>'+esc(b.at)+(e.open!==null?' · 已停留 '+e.open+' 天':'')+'</div>'
+      +(e.cardWhy?'<div class="kb-why">'+esc(e.cardWhy)+'</div>':'')
+      +'<div class="kb-d">'
+        +(r.f?'<span>出货 <b>'+esc(r.f)+'</b></span>':'')
+        +(r.h?'<span>进仓 <b>'+esc(r.h)+'</b></span>':(r.l?'<span>上架 <b>'+esc(r.l)+'</b></span>':''))
+        +(r.bk?'<span>返图DDL <b>'+esc(r.bk)+'</b></span>':'')
+      +'</div>';
+    if(e.redDate){
+      var rt=e.redLeft<0?('已超 '+(-e.redLeft)+' 天'):('剩 '+e.redLeft+' 天');
+      h+='<div class="rb-red '+(e.red==='R1'?'rb-r1':(e.red==='R2'?'rb-r2':'rb-r3'))+'" style="margin-top:7px">'
+        +'<span class="rb-k">'+esc(e.redName)+'红线</span><span class="rb-v">'+esc(e.redDate)+'</span><span class="rb-t">'+rt+'</span></div>';
+    }else if(e.redWhy){
+      h+='<div class="rb-red rb-r0" style="margin-top:7px"><span class="rb-t">'+esc(e.redWhy)+'</span></div>';
+    }
+    h+='<div class="kb-track">';
+    stages.forEach(function(s,i){h+='<i class="'+(i<idx?'done':(i===idx?'cur'+(bad?' bad':''):''))+'"></i>';});
+    h+='</div><div class="kb-track-l"><span>内容</span><span>拍摄</span><span>设计</span></div></div>';
+    return h;
+  }
+  var broke=l.filter(function(e){return e.red==='R1'||e.risk==='S2';}).length;
+  var h='<div class="ip-h"><b>全部需求看板</b><span class="muted">部门 · 共 '+l.length+' 条'
+    +' · 红线已破 '+broke+' 条 · 判定日 '+t+'</span></div>';
+  h+='<div class="dsv-sum"><div class="st"><div class="n">'+l.length+'</div><div class="l">全部需求</div></div>';
+  stages.forEach(function(s){
+    var cnt=groups[s].length,br=groups[s].filter(function(e){return e.red==='R1'||e.risk==='S2';}).length;
+    h+='<div class="st'+(br?' red':'')+'"><div class="n">'+cnt+'</div><div class="l">'+s+' · 破线 '+br+'</div></div>';
+  });
+  h+='</div>';
+  h+='<div class="dsv-note">口径：全部需求按<b>当前所处阶段</b>归档到三列；每张卡片标注<b>当前卡点、停留天数、风险等级、红线状态与三阶段进度</b>。'
+    +'卡点取钉钉「作图进度」对应的阻塞节点；风险与红线沿用工作台统一口径（内容＝出货前14天完稿、拍摄＝出货前21天寄样且样品已到不判逾期、设计＝进仓前出图，无进仓按上架兜底）。'
+    +'进度三段依次＝内容／拍摄／设计，蓝色为当前阶段、红色为当前阶段已破线、浅绿为已走完；左侧筛选同样作用于本看板。</div>';
+  h+='<div class="kb-grid">';
+  stages.forEach(function(s){
+    var arr=groups[s],br=arr.filter(function(e){return e.red==='R1'||e.risk==='S2';}).length;
+    h+='<div class="kb-col"><div class="kb-col-h"><b>'+s+'</b>'
+      +(br?'<span class="tag t-red">破线 '+br+'</span>':'')
+      +'<span class="kb-col-n">'+arr.length+' 条</span></div>';
+    if(!arr.length)h+='<div class="empty" style="padding:18px 0">该阶段暂无需求</div>';
+    arr.forEach(function(e){h+=card(e);});
+    h+='</div>';
+  });
+  h+='</div>';
+  box.innerHTML=h;
+}
 function setPane(p){
   pane=p;
-  ['list','insight','design','shoot'].forEach(function(k){
+  ['list','insight','design','shoot','board'].forEach(function(k){
     var el=document.getElementById('pane'+k.charAt(0).toUpperCase()+k.slice(1));
     if(el)el.style.display=(p===k?'':'none');
     var b=document.getElementById('psw-'+k);if(b)b.className='psw'+(p===k?' on':'');
@@ -1129,6 +1229,7 @@ function setPane(p){
   if(p==='insight')renderInsight();
   if(p==='design')renderDesign();
   if(p==='shoot')renderShoot();
+  if(p==='board')renderBoard();
 }
 function refreshAll(){
   renderHeader();
@@ -1140,6 +1241,7 @@ function refreshAll(){
   if(pane==='insight')renderInsight();
   if(pane==='design')renderDesign();
   if(pane==='shoot')renderShoot();
+  if(pane==='board')renderBoard();
 }
 
 /* ========== 事件 ========== */
@@ -1303,7 +1405,7 @@ function restoreUI(){
   if(!u)return false;
   try{sessionStorage.removeItem('wb_amzreq_ui');}catch(e){}
   view='dept'; /* 历史会话里可能存过 'mine'，一律固定为部门总览 */
-  if(u.pane==='list'||u.pane==='insight'||u.pane==='design'||u.pane==='shoot')pane=u.pane;
+  if(u.pane==='list'||u.pane==='insight'||u.pane==='design'||u.pane==='shoot'||u.pane==='board')pane=u.pane;
   if(u.status==='all'||u.status==='anchor')statusFilter=u.status;
   if(u.sel&&u.sel.type)sel={type:u.sel.type,val:u.sel.val};
   if(u.designSort==='delay'||u.designSort==='wh')designSort=u.designSort;
@@ -1315,10 +1417,10 @@ function syncUIButtons(){
   ['all','anchor'].forEach(function(k){
     var b=document.getElementById('sf-'+k);if(b)b.className='chip'+(statusFilter===k?' on':'');
   });
-  ['list','insight','design','shoot'].forEach(function(k){
+  ['list','insight','design','shoot','board'].forEach(function(k){
     var b=document.getElementById('psw-'+k);if(b)b.className='psw'+(pane===k?' on':'');
   });
-  ['list','insight','design','shoot'].forEach(function(k){
+  ['list','insight','design','shoot','board'].forEach(function(k){
     var el=document.getElementById('pane'+k.charAt(0).toUpperCase()+k.slice(1));
     if(el)el.style.display=(pane===k?'':'none');
   });
