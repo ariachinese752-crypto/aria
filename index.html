@@ -506,13 +506,6 @@ function diffD(a,b){
   if(!a||!b)return null;
   return Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000);
 }
-/* 日期偏移：用于由首批出货 F 推拍摄寄样节点 F-21 */
-function shiftDay(ds,off){
-  if(!ds)return '';
-  var d=new Date(ds+'T00:00:00');d.setDate(d.getDate()+off);
-  var p=function(x){return (x<10?'0':'')+x;};
-  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
-}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){
   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 
@@ -1044,41 +1037,27 @@ function renderDesign(){
 }
 /* ===== 拍摄返图卡点视图 =====
    数据源：主视图 eG9FNYm（与「设计卡点」页的副本视图 29K13XF 相互独立）。
-   纳入两类「拍摄维度延期」需求：
-   A. 当前仍处【拍摄阶段】（返图未闭环，进不了设计作图）——基准＝钉钉「拍摄返图时间」(DDvcSyi)：
-      公式字段＝首批出货 + 5 天的【计划返图节点】，不是实际返图发生日（钉钉表暂无「实际拍摄返图日」字段）。
-   B. 仍处【内容阶段】（状态还在需求撰写中），但内容需求已延期（红线已破 / 交付逾期），
-      且拍摄寄样节点（首批出货 F−21）也已过——拍摄维度同样超期，不能因为 stage 不是「拍摄阶段」就漏掉。
-      这类以【寄样节点 F−21】为基准，并在明细标注「内容阶段带入」。
-   超期天数 = 判定日 − 基准；正数＝已超节点，负数＝距节点还有几天。
-   基准为空的记录不纳入超期统计（忽略空值），仅在明细里列出。 */
+   口径：「卡在拍摄没返图」= 需求当前仍处【拍摄阶段】（拍摄返图未闭环，进不了设计作图）。
+   基准 = 钉钉「拍摄返图时间」(DDvcSyi)：公式字段＝首批出货 + 5 天的【计划返图节点】，
+          不是实际返图发生日（钉钉表暂无「实际拍摄返图日」字段）。
+   超期天数 = 判定日 − 计划返图节点；正数＝已超节点仍没返图，负数＝距节点还有几天。
+   拍摄返图时间为空的记录不纳入超期统计（忽略空值），仅在明细里列出。 */
 var shootSort='overdue';
 function setShootSort(v){shootSort=v;refreshAll();}
 function renderShoot(){
   var box=document.getElementById('paneShoot');
   if(!box)return;
   var t=todayStr();
-  var rows=allEnriched().filter(function(e){
-    if(e.stage==='拍摄阶段')return true;                       /* A. 拍摄阶段未闭环 */
-    if(e.stage==='内容阶段'){                                  /* B. 内容阶段但拍摄节点也超期 */
-      var contentLate=(e.red==='R1')||(e.dExp!==null&&e.dExp<0);
-      if(!contentLate)return false;                             /* 内容需求没延期 → 不带入 */
-      var sendDdl=shiftDay(e.r.f,-21);                          /* 拍摄寄样节点 F−21 */
-      return !!sendDdl&&diffD(sendDdl,t)>0;                     /* 寄样节点未过 → 不算拍摄延期 */
-    }
-    return false;
-  }).map(function(e){
+  var rows=allEnriched().filter(function(e){return e.stage==='拍摄阶段';}).map(function(e){
     var r=e.r;
-    var carried=(e.stage!=='拍摄阶段');                        /* 内容阶段带入标记 */
-    var sendDdl=carried?shiftDay(r.f,-21):'';                  /* 带入行用寄样节点作基准 */
-    var base=sendDdl||(r.bk||r.h||r.l||'');                    /* 返图DDL：拍摄返图时间优先，为空则依次用「进仓→上架」兜底 */
-    var over=base?diffD(base,t):null;                          /* 今天 − 基准；正=已超，负=距节点还有 */
-    var anchor=r.h||r.l||'';                                   /* 距离上架的锚点：进仓优先，无进仓才用上架兜底 */
-    var anchorLabel=r.h?'进仓':'上架';                          /* 当前锚点类型，明细小字标注 */
-    var toLaunch=anchor?diffD(t,anchor):null;                   /* 今天 → 锚点：正数=还有几天，负数=已过节点 */
+    var base=r.bk||r.h||r.l||'';              /* 返图DDL：拍摄返图时间优先，为空则依次用「进仓→上架」兜底 */
+    var over=base?diffD(base,t):null;        /* 今天 − 返图DDL；正=已超，负=距节点还有 */
+    var anchor=r.h||r.l||'';                 /* 距离上架的锚点：进仓优先，无进仓才用上架兜底 */
+    var anchorLabel=r.h?'进仓':'上架';        /* 当前锚点类型，明细小字标注 */
+    var toLaunch=anchor?diffD(t,anchor):null; /* 今天 → 锚点：正数=还有几天，负数=已过节点 */
     var b=BLOCK_OF[r.p]||{at:r.p||'—'};
     return {r:r,at:b.at,prog:r.p||'—',owner:r.w||'未分配',
-      carried:carried,sendDdl:sendDdl,base:base,over:over,toLaunch:toLaunch,anchor:anchor,anchorLabel:anchorLabel};
+      base:base,over:over,toLaunch:toLaunch,anchor:anchor,anchorLabel:anchorLabel};
   });
   if(shootSort==='base'){
     /* 计划返图节点从旧到新；无基准排最后 */
@@ -1095,23 +1074,18 @@ function renderShoot(){
   var avg=late.length?Math.round(late.reduce(function(s,x){return s+x.over;},0)/late.length):0;
   var max=late.length?Math.max.apply(null,late.map(function(x){return x.over;})):0;
   var noBase=rows.length-calc.length;
-  var carriedN=rows.filter(function(x){return x.carried;}).length;
   function ss(n,l,c){return '<div class="st '+(c||'')+'"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>';}
   var h='<div class="ip-h"><b>拍摄返图卡点 · 未返图节点核算</b><span class="muted">数据源：新品&amp;新增变体时间节点视图（主）'
     +' · 卡点 '+rows.length+' 条 · 判定日 '+t+'</span></div>';
   h+='<div class="dsv-sum">'
-    +ss(rows.length,'拍摄卡点需求','')
-    +ss(late.length,'已超节点','red')
+    +ss(rows.length,'拍摄未返图需求','')
+    +ss(late.length,'已超返图节点','red')
     +ss(avg+' 天','平均超期','red')
     +ss(max+' 天','最长超期','red')
-    +(carriedN?ss(carriedN+' 条','内容阶段带入',''):'')
     +'</div>';
-  h+='<div class="dsv-note">口径：本页纳入两类<b>拍摄维度延期</b>需求：<b>① 仍处拍摄阶段</b>（返图未闭环，尚未进入设计作图），'
-    +'以钉钉「<b>拍摄返图时间</b>」（表头记作 <b>返图DDL</b>）为基准；'
-    +'<b>② 仍处内容阶段（状态还在需求撰写中），但内容需求已延期（红线已破／交付逾期），且拍摄寄样节点（首批出货 F−21）也已过</b>，'
-    +'以<b>寄样节点 F−21</b>为基准并在明细标注「内容阶段带入」——<b>不再因为阶段不是「拍摄阶段」就漏掉</b>。'
-    +'<b>超期天数 ＝ 判定日 − 基准</b>：正数＝已超节点，负数＝距节点还有几天。'
-    +'基准 <b>优先取拍摄返图时间，为空则依次用「进仓 → 上架」兜底</b>（进仓优先，与距离上架同口径）；<b>三者全空的 '+noBase+' 条不纳入超期统计</b>，仅在明细列出。'
+  h+='<div class="dsv-note">口径：<b>「卡在拍摄没返图」＝需求仍处拍摄阶段</b>（拍摄返图未闭环，尚未进入设计作图）。'
+    +'以钉钉「<b>拍摄返图时间</b>」（表头记作 <b>返图DDL</b>）为基准，<b>超期天数 ＝ 判定日 − 返图DDL</b>：正数＝已超计划返图节点却仍没返图，负数＝距节点还有几天。'
+    +'返图DDL <b>优先取拍摄返图时间，为空则依次用「进仓 → 上架」兜底</b>（进仓优先，与距离上架同口径）；<b>三者全空的 '+noBase+' 条不纳入超期统计</b>，仅在明细列出。'
     +'列「<b>距离上架</b>」＝ 目标日期 − 判定日（正数＝还有几天，负数＝已过节点）：<b>有预计进仓时间就取进仓，没有进仓才用预计上架兜底</b>，下方小字标注「进仓／上架 + 具体日期」；<b>进仓与上架都为空则留空不计算</b>。'
     +'⚠️ 注意：「拍摄返图时间」是钉钉<b>公式字段＝首批出货 + 5 天的计划返图节点</b>，<b>并非实际返图发生日</b>；'
     +'钉钉表暂无「实际拍摄返图日」字段，因此本页衡量的是「相对计划节点的卡点时长 / 紧迫度」，不是实际返图延误核算。'
@@ -1131,12 +1105,8 @@ function renderShoot(){
     h+='<tr><td class="nm" style="white-space:normal">'+esc(x.r.n)
       +'<div style="font-size:11px;color:var(--gray);font-weight:400">'+esc(x.owner)+'</div></td>'
       +'<td class="mintxt" style="white-space:nowrap">'+esc(x.at)
-        +'<div style="font-size:11px;opacity:.72">'+esc(x.prog)+'</div>'
-        +(x.carried?'<div style="font-size:11px;color:#A32D2D;font-weight:600">内容阶段带入 · 寄样节点已过</div>':'')
-      +'</td>'
-      +'<td class="mintxt" style="white-space:nowrap">'+(x.base?esc(x.base):'<span class="rb-na">未填</span>')
-        +(x.carried?'<div style="font-size:11px;color:var(--gray);font-weight:400">寄样节点 F−21</div>':'')
-      +'</td>'
+        +'<div style="font-size:11px;opacity:.72">'+esc(x.prog)+'</div></td>'
+      +'<td class="mintxt" style="white-space:nowrap">'+(x.base?esc(x.base):'<span class="rb-na">未填</span>')+'</td>'
       +'<td class="num '+(x.over>0?'bad':'')+'">'+otxt
         +(x.over>0?'<div class="dsv-bar"><i class="hot" style="width:'
           +Math.min(100,Math.round(x.over/Math.max(max,1)*100))+'%"></i></div>':'')
@@ -1146,7 +1116,7 @@ function renderShoot(){
       +'</td></tr>';
   });
   h+='</tbody></table></div>';
-  if(!rows.length)h+='<div class="card empty">当前没有拍摄维度卡点需求，寄样与返图节点已全部闭环 ✅</div>';
+  if(!rows.length)h+='<div class="card empty">当前没有卡在拍摄阶段的需求，拍摄返图节点已全部闭环 ✅</div>';
   box.innerHTML=h;
 }
 function setPane(p){
