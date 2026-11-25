@@ -22,7 +22,7 @@ body{
   padding-bottom:calc(28px + env(safe-area-inset-bottom));
   -webkit-text-size-adjust:100%;
 }
-.wrap{max-width:1600px;margin:0 auto;padding:14px}
+.wrap{max-width:1400px;margin:0 auto;padding:14px}
 h1{font-size:17px;font-weight:500}
 .card{background:#fff;border:0.5px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px}
 button,.btn{
@@ -84,7 +84,7 @@ label{display:block;font-size:13px;color:var(--gray);margin-bottom:4px}
 
 /* header */
 header{background:#fff;border-bottom:0.5px solid var(--line);padding:12px 16px;position:sticky;top:0;z-index:20}
-.hd{max-width:1600px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.hd{max-width:1400px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .hd-l{display:flex;align-items:center;gap:10px;min-width:0}
 .hd-acts{display:flex;gap:6px;flex-wrap:wrap}
 
@@ -247,7 +247,8 @@ header{background:#fff;border-bottom:0.5px solid var(--line);padding:12px 16px;p
   border:0.5px solid var(--line);background:#fff;color:var(--gray);cursor:pointer}
 .dsv-sort.on{background:var(--blue);color:#fff;border-color:var(--blue)}
 /* ===== 全部需求看板：按阶段分列，标注卡点进度 ===== */
-.kb-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:start}
+.kb-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:start}
+@media(max-width:1200px){.kb-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:900px){.kb-grid{grid-template-columns:1fr}}
 .kb-col{background:#fff;border:0.5px solid var(--line);border-radius:12px;padding:12px;min-height:140px}
 .kb-col-h{display:flex;align-items:center;gap:7px;padding-bottom:9px;border-bottom:0.5px solid var(--line);margin-bottom:10px;flex-wrap:wrap}
@@ -459,6 +460,20 @@ var RISK_LABEL={R1:'红线已破',R2:'红线告急',R3:'红线临近',R0:'缺时
   S7:'卡在自己手上',S8:'外部依赖中',S10:'同事跟进中',OK:'正常'};
 var RISK_ORDER=['R1','R2','R3','R0','S2','S9','S4','S5','S7','S10','S8','OK'];
 var STAGE_ORDER=['内容阶段','拍摄阶段','设计阶段'];
+/* 全部需求看板专用：把钉钉三阶段细拆为四阶段（需求 → 样品 → 拍摄返图 → 设计） */
+var BOARD_STAGE_ORDER=['需求阶段','样品阶段','拍摄返图阶段','设计阶段'];
+var BOARD_STAGE_OF={
+  '未开始':'需求阶段','BOM信息整理中':'需求阶段','提交寄样需求':'需求阶段','作图需求编写中':'需求阶段',
+  '文案撰写中':'需求阶段','剪辑需求编写中':'需求阶段',
+  '等待拍摄样':'样品阶段',
+  '机构排期中':'拍摄返图阶段','拍摄机构排期中':'拍摄返图阶段','产品拍摄中':'拍摄返图阶段','等待拍摄返图':'拍摄返图阶段',
+  '设计排期中':'设计阶段','设计作图中':'设计阶段','视频剪辑中':'设计阶段','待检查链接':'设计阶段'
+};
+function boardStage(e){
+  var s=e.r&&e.r.s;
+  if(BOARD_STAGE_ORDER.indexOf(s)>=0)return s;     /* 钉钉若已给出四阶段值，直接采用 */
+  return BOARD_STAGE_OF[e.r&&e.r.p]||'需求阶段';    /* 否则按「作图进度」细分；未知进度默认需求阶段 */
+}
 
 var DEFAULT_LINKS=[
  {n:'新品&新增变体时间节点视图',u:'https://alidocs.dingtalk.com/i/nodes/P7QG4Yx2JpKrZmKgCeBxb4rGV9dEq3XD?entrance=data&sheetId=hERWDMS&viewId=eG9FNYm'},
@@ -1147,17 +1162,17 @@ function renderShoot(){
 }
 /* ========== 全部需求看板（按阶段分列，标注卡点进度） ==========
    数据源：主视图 eG9FNYm（与需求清单同一份 SEED）。
-   三列 = 内容／拍摄／设计阶段；每条需求按「当前所处阶段」归档，
-   卡片标注：当前卡点、停留天数、风险等级、负责人、红线状态与三阶段进度。 */
+   四列 = 需求／样品／拍摄返图／设计阶段；每条需求按「作图进度」细分归档，
+   卡片标注：当前卡点、停留天数、风险等级、负责人、红线状态与四阶段进度。 */
 function renderBoard(){
   var box=document.getElementById('paneBoard');
   if(!box)return;
   var t=todayStr();
   var l=allEnriched().filter(function(e){return inScope(e)&&selOK(e);});
-  var stages=STAGE_ORDER.slice();
+  var stages=BOARD_STAGE_ORDER.slice();
   var groups={};
   stages.forEach(function(s){groups[s]=[];});
-  l.forEach(function(e){if(groups[e.stage])groups[e.stage].push(e);});
+  l.forEach(function(e){var bs=boardStage(e);if(groups[bs])groups[bs].push(e);});
   var sev={'R1':0,'S2':1,'R2':2,'R3':3,'R0':4,'S4':5,'S5':6,'S7':7,'S9':8,'S10':9,'S8':10,'OK':11};
   stages.forEach(function(s){
     groups[s].sort(function(a,b){
@@ -1166,14 +1181,14 @@ function renderBoard(){
     });
   });
   function card(e,carry){
-    var r=e.r, idx=stages.indexOf(e.stage);
+    var r=e.r, bs=boardStage(e), idx=stages.indexOf(bs);
     var bad=(e.risk==='R1'||e.risk==='S2');
     var rk=bad?'t-red':(e.risk==='R2'||e.risk==='R3'||e.risk==='S7'?'t-amber':'t-gray');
     var b=BLOCK_OF[r.p]||{at:r.p||'—',w:''};
     var h='<div class="kb-card'+(bad?' od':'')+'">'
       +'<div class="kb-n">'+esc(r.n)+'</div>'
       +'<div class="kb-m">'
-      +(carry?'<span class="tag t-amber">内容阶段带入</span>':'')
+      +(carry?'<span class="tag t-amber">需求阶段带入</span>':'')
       +'<span class="tag '+rk+'">'+esc(RISK_LABEL[e.risk]||e.risk)+'</span>'
         +'<span class="tag '+(r.w==='晓晓'?'t-blue':'t-gray')+'">'+esc(r.w||'未分配')+'</span>'
         +'<span class="tag t-gray">'+esc(r.p||'—')+'</span></div>'
@@ -1193,28 +1208,28 @@ function renderBoard(){
     }
     h+='<div class="kb-track">';
     stages.forEach(function(s,i){h+='<i class="'+(i<idx?'done':(i===idx?'cur'+(bad?' bad':''):''))+'"></i>';});
-    h+='</div><div class="kb-track-l"><span>内容</span><span>拍摄</span><span>设计</span></div></div>';
+    h+='</div><div class="kb-track-l"><span>需求</span><span>样品</span><span>拍摄返图</span><span>设计</span></div></div>';
     return h;
   }
   var broke=l.filter(function(e){return e.red==='R1'||e.risk==='S2';}).length;
-  var carry=groups['内容阶段'].slice();   /* 拍摄列额外带上内容阶段需求；内容列仍保留，属跨列提示，不重复计入总数 */
+  var carry=groups['需求阶段'].slice();   /* 拍摄返图列额外带上需求阶段需求；需求列仍保留，属跨列提示，不重复计入总数 */
   var h='<div class="ip-h"><b>全部需求看板</b><span class="muted">部门 · 共 '+l.length+' 条'
     +' · 红线已破 '+broke+' 条 · 判定日 '+t+'</span></div>';
   h+='<div class="dsv-sum"><div class="st"><div class="n">'+l.length+'</div><div class="l">全部需求</div></div>';
   stages.forEach(function(s){
-    var cnt=groups[s].length+(s==='拍摄阶段'?carry.length:0);
+    var cnt=groups[s].length+(s==='拍摄返图阶段'?carry.length:0);
     var br=groups[s].filter(function(e){return e.red==='R1'||e.risk==='S2';}).length
-      +(s==='拍摄阶段'?carry.filter(function(e){return e.red==='R1'||e.risk==='S2';}).length:0);
+      +(s==='拍摄返图阶段'?carry.filter(function(e){return e.red==='R1'||e.risk==='S2';}).length:0);
     h+='<div class="st'+(br?' red':'')+'"><div class="n">'+cnt+'</div><div class="l">'+s+' · 破线 '+br+'</div></div>';
   });
   h+='</div>';
-  h+='<div class="dsv-note">口径：全部需求按<b>当前所处阶段</b>归档到三列；每张卡片标注<b>当前卡点、停留天数、风险等级、红线状态与三阶段进度</b>。'
-    +'<b>拍摄列额外带上仍处内容／需求阶段的需求</b>（卡片标「内容阶段带入」，便于提前看到待进拍摄的排队量；内容列仍保留，属跨列提示，不重复计入「全部需求」总数）。'
-    +'卡点取钉钉「作图进度」对应的阻塞节点；风险与红线沿用工作台统一口径（内容＝出货前14天完稿、拍摄＝出货前21天寄样且样品已到不判逾期、设计＝进仓前出图，无进仓按上架兜底）。'
-    +'进度三段依次＝内容／拍摄／设计，蓝色为当前阶段、红色为当前阶段已破线、浅绿为已走完；左侧筛选同样作用于本看板。</div>';
+  h+='<div class="dsv-note">口径：全部需求按钉钉「<b>作图进度</b>」细分为<b>需求／样品／拍摄返图／设计</b>四列归档；每张卡片标注<b>当前卡点、停留天数、风险等级、红线状态与四阶段进度</b>。'
+    +'<b>拍摄返图列额外带上仍处需求阶段的需求</b>（卡片标「需求阶段带入」，便于提前看到待进拍摄的排队量；需求列仍保留，属跨列提示，不重复计入「全部需求」总数）。'
+    +'卡点取钉钉「作图进度」对应的阻塞节点；风险与红线沿用工作台统一口径（内容＝出货前14天完稿、拍摄＝出货前21天寄样且样品已到不判逾期、返图＝进仓前40天完成、设计＝进仓前出图，无进仓按上架兜底）。'
+    +'进度四段依次＝需求／样品／拍摄返图／设计，蓝色为当前阶段、红色为当前阶段已破线、浅绿为已走完；左侧筛选同样作用于本看板。</div>';
   h+='<div class="kb-grid">';
   stages.forEach(function(s){
-    var arr=groups[s].slice(), extra=(s==='拍摄阶段'?carry:[]), all=arr.concat(extra);
+    var arr=groups[s].slice(), extra=(s==='拍摄返图阶段'?carry:[]), all=arr.concat(extra);
     var br=all.filter(function(e){return e.red==='R1'||e.risk==='S2';}).length;
     h+='<div class="kb-col"><div class="kb-col-h"><b>'+s+'</b>'
       +(br?'<span class="tag t-red">破线 '+br+'</span>':'')
